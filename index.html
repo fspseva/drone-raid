@@ -1,0 +1,1579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DRONE RAID</title>
+<style>
+  @font-face {
+    font-family: 'Departure Mono';
+    src: url('DepartureMono-Regular.otf') format('opentype');
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    background: #303030;
+    overflow: hidden;
+    font-family: 'Departure Mono', monospace;
+    color: #e8e4d8;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+  }
+  #frame {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #stage {
+    position: relative;
+    /* sized by JS to keep integer pixel scale */
+  }
+  canvas {
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    width: 100%;
+    height: 100%;
+    background: #303030;
+  }
+  #hud {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    user-select: none;
+    text-transform: uppercase;
+  }
+  #hud .blink { animation: blink 0.6s steps(1) infinite; }
+  #hud pre { font-family: inherit; }
+  .tape {
+    position: absolute;
+    top: 50%;
+    font-size: 14px;
+    line-height: 14px;
+    white-space: pre;
+  }
+  #tapeL { left: 10px; }
+  #tapeR { right: 10px; }
+  .tapebox {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 1px solid #e8e4d8;
+    background: #303030;
+    padding: 2px 5px;
+    font-size: 15px;
+    white-space: pre;
+  }
+  #boxL { left: 10px; }
+  #boxR { right: 10px; }
+  #bank {
+    position: absolute;
+    top: 3.5%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 14px;
+    line-height: 12px;
+    white-space: pre;
+    text-align: left;
+  }
+  #wind {
+    position: absolute;
+    top: 3.5%;
+    left: 9%;
+    font-size: 13px;
+    letter-spacing: 1px;
+  }
+  #lvl {
+    position: absolute;
+    top: 8%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 13px;
+    letter-spacing: 3px;
+  }
+  #obj {
+    position: absolute;
+    top: 11.5%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 13px;
+    letter-spacing: 3px;
+    color: #9e4b4b;
+  }
+  .tapebox.inband {
+    background: #e8e4d8;
+    color: #303030;
+    border-color: #e8e4d8;
+  }
+  #gs {
+    position: absolute;
+    bottom: 5.5%;
+    right: 2%;
+    font-size: 13px;
+    letter-spacing: 1px;
+  }
+  #menu {
+    position: absolute;
+    bottom: 1.2%;
+    right: 2%;
+    font-size: 13px;
+    letter-spacing: 1px;
+  }
+  #stat {
+    position: absolute;
+    bottom: 1.2%;
+    left: 2%;
+    font-size: 13px;
+    line-height: 1.6;
+    letter-spacing: 1px;
+    text-align: left;
+    white-space: pre;
+  }
+  #msg {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    user-select: none;
+    gap: 14px;
+  }
+  #msg .title {
+    font-size: 52px;
+    letter-spacing: 12px;
+  }
+  #msg .titleorn {
+    font-size: 14px;
+    letter-spacing: 0;
+    white-space: pre;
+  }
+  #msg .sub {
+    font-size: 13px;
+    letter-spacing: 2px;
+    color: #e8e4d8;
+    line-height: 2;
+  }
+  #msg .blink { animation: blink 1.1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  #banner {
+    position: absolute;
+    top: 16%;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 13px;
+    letter-spacing: 3px;
+    color: #e8e4d8;
+    user-select: none;
+  }
+  .hidden { display: none !important; }
+  /* temporary level testbed */
+  #panel {
+    position: absolute;
+    top: 4.5%;
+    right: 4.5%;
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: #e8e4d8;
+    background: #303030;
+    border: 1px solid #e8e4d8;
+    padding: 6px 10px;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  #panel button {
+    font-family: inherit;
+    font-size: 11px;
+    color: #e8e4d8;
+    background: #303030;
+    border: 1px solid #e8e4d8;
+    width: 18px; height: 16px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+  }
+</style>
+</head>
+<body>
+<div id="frame">
+  <div id="stage">
+    <canvas id="game" width="320" height="180"></canvas>
+    <div id="hud" class="hidden">
+      <pre id="tapeL" class="tape"></pre>
+      <div id="boxL" class="tapebox"></div>
+      <pre id="tapeR" class="tape"></pre>
+      <div id="boxR" class="tapebox"></div>
+      <pre id="bank"></pre>
+      <div id="lvl"></div>
+      <div id="obj"></div>
+      <div id="wind"></div>
+      <div id="gs"></div>
+      <div id="menu">ESC MENU</div>
+      <pre id="stat"></pre>
+    </div>
+    <div id="banner" class="hidden"></div>
+    <div id="panel"></div>
+    <div id="msg">
+      <div class="titleorn">──────────────&#9660;──────────────</div>
+      <div class="title">DRONE RAID</div>
+      <div class="titleorn">──────────────&#9650;──────────────</div>
+      <div class="sub">
+        THRUST&nbsp;&nbsp;W / &#8593;&nbsp;&nbsp;&nbsp;&nbsp;BRAKE&nbsp;&nbsp;S / &#8595;<br>
+        TILT&nbsp;&nbsp;A D / &#8592; &#8594;&nbsp;&nbsp;&nbsp;&nbsp;BOMB&nbsp;&nbsp;SPACE
+      </div>
+      <div class="sub blink">PRESS ENTER TO START</div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ---------- display ---------- */
+const VW = 320, VH = 180;              // virtual resolution (px)
+const PPM = 8;                          // pixels per meter (sim units)
+const ALT_SCALE = 4;                    // HUD display: soldier (4px) = 2m -> 1px = 0.5m
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const stage = document.getElementById('stage');
+const hudEl = document.getElementById('hud');
+const tapeLEl = document.getElementById('tapeL');
+const boxLEl = document.getElementById('boxL');
+const tapeREl = document.getElementById('tapeR');
+const boxREl = document.getElementById('boxR');
+const bankEl = document.getElementById('bank');
+const windEl = document.getElementById('wind');
+const gsEl = document.getElementById('gs');
+const statEl = document.getElementById('stat');
+const lvlEl = document.getElementById('lvl');
+const objEl = document.getElementById('obj');
+const msgEl = document.getElementById('msg');
+const titleHTML = msgEl.innerHTML;   // for returning to the menu via ESC
+const bannerEl = document.getElementById('banner');
+
+function fit() {
+  const s = Math.max(1, Math.min(innerWidth / VW, innerHeight / VH));
+  stage.style.width = Math.round(VW * s) + 'px';
+  stage.style.height = Math.round(VH * s) + 'px';
+}
+addEventListener('resize', fit);
+fit();
+
+/* ---------- physics constants (SI units) ---------- */
+const G = 9.81;                 // m/s^2
+const TWR = 3.0;                // thrust-to-weight ratio at Earth gravity
+const MAX_THRUST = TWR * 9.81;  // max thrust acceleration, m/s^2 (motor spec, fixed)
+const DRAG = 0.008;             // quadratic drag coefficient (1/m) -> terminal fall ~35 m/s
+const MAX_TILT = 60 * Math.PI / 180;    // rad
+const TILT_RATE = 420 * Math.PI / 180;  // rad/s when steering
+const LEVEL_RATE = 320 * Math.PI / 180; // rad/s auto-level
+const THROTTLE_UP = 3.0;        // throttle units/s while thrust key held
+const THROTTLE_DECAY = 2.0;     // throttle units/s bleed-off when released
+const THROTTLE_BRAKE = 6.0;     // throttle units/s while brake key held
+const REV_THRUST = 0.5;         // reverse-thrust fraction of max while braking
+const CRASH_SPEED = 6;          // m/s vertical impact limit
+const BATT_IDLE = 0.5;          // %/s drain with motors armed
+const BATT_LOAD = 2.7;          // %/s extra drain at full throttle
+const RECHARGE = 10;            // %/s while parked on the launchpad
+const WORLD_W = VW / PPM;       // world wraps at one screen width (m)
+const GROUND_Y = 30;            // ground line, px from bottom of view
+
+/* ---------- palette ---------- */
+const BG = '#303030';   // grey
+const FG = '#e8e4d8';   // muted white
+const RED = '#9e4b4b';     // muted red — soldier casualties only
+const YELLOW = '#c2a24e';  // vintage yellow — destroyed vehicles only
+
+/* ---------- state ---------- */
+const S = { TITLE: 0, FLYING: 1, CRASHED: 2, COMPLETE: 3, DESTROYED: 4 };
+let state = S.TITLE;
+let won = false;      // mission accomplished but the drone is still flying
+
+const PAD = { x: 4, w: 2.0, h: 0.5 };  // launch pad, far left (sim units)
+const TENT = { x: WORLD_W * 0.75, w: 2.0, h: 1.25 };  // sim units
+const BLAST_R = 1.2;      // blast radius, a bit wider than the drone
+const BULLET_SPEED = 18;  // slow enough to see and dodge
+// per-class engagement range + round lifetime (real-weapon ratios, normalized)
+const WEAPON = {
+  3: { range: 12, life: 0.75 },  // pistol   ~48 display-m
+  4: { range: 10, life: 0.8  },  // shotgun  ~40 display-m, pellets die early
+  5: { range: 20, life: 1.2  },  // light tank ~80 display-m
+  6: { range: 28, life: 1.6  },  // heavy tank ~112 display-m
+};
+let tentAlive = true;
+let padAlive = true;
+let soldiers = [];    // moving targets on the ground
+let bullets = [];     // { x, y, vx, vy, life }
+let hasLifted = false;
+let craters = [];     // { x } — holes blasted into the ground
+let boomFx = null;    // { x, y, age } — explosion flash
+let airBombs = [];    // { x, y, vx, vy } — bombs in flight (no drop delay)
+let bombsLeft = 1;
+let chunks = [];      // severed tree pieces falling as rigid bodies
+let reloadT = 0;      // bomb reload progress while parked on the pad
+
+// --- temporary test controls: class + quantity, applied on next start ---
+/* =====================================================================
+   LEVEL BALANCE TABLE — edit the numbers freely, one row per level.
+
+     WAN  wanderer         (hides in tent & bushes)
+     FUG  fugitive         (sprints from drone & bombs)
+     PST  pistol soldier   (1 shot / 2s,  range 12)
+     SHG  shotgun soldier  (3-spread / 5s, range 8)
+     LTK  light tank       (2 blasts to kill, 1 shot / 2.5s, range 20)
+     HTK  heavy tank       (3 blasts to kill, 3-burst / 3.5s, range 28)
+     BOMBS = drone loadout at start (the pad reloads 1/s up to this)
+
+   Past the last row, each extra level adds +1 FUG and +1 PST (cap 6).
+   ===================================================================== */
+function L(wan, fug, pst, shg, ltk, htk, bombs) {
+  return { units: { 1: wan, 2: fug, 3: pst, 4: shg, 5: ltk, 6: htk }, bombs };
+}
+const LEVELS = [
+  //  WAN FUG PST SHG LTK HTK BOMBS
+  L(   1,  0,  0,  0,  0,  0,  0 ),   // 1
+  L(   2,  0,  0,  0,  0,  0,  1 ),   // 2
+  L(   0,  1,  0,  0,  0,  0,  1 ),   // 3
+  L(   1,  1,  0,  0,  0,  0,  1 ),   // 4
+  L(   0,  0,  1,  0,  0,  0,  1 ),   // 5
+  L(   0,  0,  2,  0,  0,  0,  2 ),   // 6
+  L(   1,  2,  1,  0,  0,  0,  2 ),   // 7
+  L(   0,  0,  2,  1,  0,  0,  2 ),   // 8
+  L(   2,  2,  2,  1,  0,  0,  2 ),   // 9
+  L(   1,  2,  1,  1,  1,  0,  3 ),   // 10
+  L(   0,  2,  2,  2,  1,  0,  3 ),   // 11
+  L(   2,  2,  2,  1,  1,  1,  4 ),   // 12
+  L(   0,  3,  3,  2,  2,  1,  4 ),   // 13
+  L(   2,  3,  3,  2,  2,  2,  5 ),   // 14
+];
+let level = 1;
+let levelCleared = false;   // pending advance on next Enter
+let bombConfig = 1;         // bombs loaded on the drone at start (set per level)
+// the war drone: small airframe, hot FPV tune
+const DRONE_SPEC = { k: 0.6, hit: 0.35, twr: 4.0, drag: 0.010, lin: 0.08 };
+
+// wind: horizontal; calm until the first heavy tank kill, then rolled per
+// run — 5-10 m/s for the 5 levels after that milestone, 10-30 m/s beyond
+let windSpeed = 0;          // rolled per run
+let windDir = 1;            // +1 right, -1 left
+let heavyKilledLevel = 0;   // level of the first heavy tank kill (0 = not yet)
+
+/* ---------- vegetation: procedural trees & bushes, rescattered every run ---------- */
+let plants = [];   // { x, rects, halfW } — rects are [x, y, w, h] px offsets, y up from ground
+
+function genPine(r) {
+  const rects = [];
+  const h = 6 + Math.floor(r() * 13);
+  const trunkH = 2 + Math.floor(r() * 2);
+  const maxW = 7 + Math.floor(h / 4);
+  rects.push([0, 0, 1, trunkH]);
+  let w = 1;
+  for (let i = 0; i < h; i++) {
+    const y = trunkH + h - 1 - i;
+    rects.push([-Math.floor(w / 2), y, w, 1]);
+    w += r() < 0.4 ? 0 : (r() < 0.8 ? 1 : 2);
+    if (r() < 0.15 && w > 3) w -= 1;
+    w = Math.min(w, maxW);
+  }
+  return rects;
+}
+
+function genBroadleaf(r) {
+  const rects = [];
+  const trunkH = 3 + Math.floor(r() * 7);
+  rects.push([0, 0, 1, trunkH]);
+  const rows = 4 + Math.floor(r() * 7);
+  const maxW = 5 + Math.floor(r() * 3) + (rows > 7 ? 1 : 0);
+  let cx = 0;
+  for (let i = 0; i < rows; i++) {
+    const t = i / (rows - 1);
+    let w = Math.round(maxW * Math.sin(Math.PI * (0.25 + 0.55 * t)));
+    if (r() < 0.4) w += r() < 0.5 ? -1 : 1;
+    w = Math.max(2, Math.min(9, w));
+    rects.push([cx - Math.floor(w / 2), trunkH - 1 + i, w, 1]);
+    if (r() < 0.35) cx += r() < 0.5 ? -1 : 1;
+    cx = Math.max(-1, Math.min(1, cx));
+  }
+  return rects;
+}
+
+function genDead(r) {
+  const rects = [];
+  const h = 6 + Math.floor(r() * 12);
+  rects.push([0, 0, 1, h]);
+  let side = r() < 0.5 ? 1 : -1;
+  let by = 2 + Math.floor(r() * 2);
+  while (by < h - 2) {
+    const bl = 2 + Math.floor(r() * 3);
+    rects.push([side === 1 ? 1 : -bl, by, bl, 1]);
+    rects.push([side * bl, by + 1, 1, 1 + Math.floor(r() * 2)]);
+    side = -side;
+    by += 2 + Math.floor(r() * 3);
+  }
+  if (r() < 0.5) rects.push([-side, h - 1, 1, 1]);
+  return rects;
+}
+
+function genBush(r) {
+  const rects = [];
+  const rows = 2 + Math.floor(r() * 3);
+  let w = 4 + Math.floor(r() * 5);
+  let cx = 0;
+  for (let i = 0; i < rows; i++) {
+    rects.push([cx - Math.floor(w / 2), i, w, 1]);
+    w -= 1 + Math.floor(r() * 2);
+    if (w < 2) break;
+    if (r() < 0.5) cx += r() < 0.5 ? -1 : 1;
+    cx = Math.max(-2, Math.min(2, cx));
+  }
+  if (r() < 0.35) rects.push([3 + Math.floor(r() * 2), 0, 2, 1]);
+  rects.push([Math.floor(r() * 3) - 1, 0, 2, 4]);   // soldier-height tuft to hide in
+  return rects;
+}
+
+function scatterPlants() {
+  plants = [];
+  const gens = [genPine, genBroadleaf, genDead, genBush, genBush]; // bushes a bit more common
+  const target = 6 + Math.floor(Math.random() * 5);
+  let tries = 0;
+  while (plants.length < target && tries++ < 300) {
+    const gen = gens[Math.floor(Math.random() * gens.length)];
+    const rects = gen(Math.random);
+    let halfW = 1, hPx = 1;
+    for (const [x, y, w, h] of rects) {
+      halfW = Math.max(halfW, Math.abs(x), Math.abs(x + w));
+      hPx = Math.max(hPx, y + h);
+    }
+    halfW /= PPM;
+    const height = hPx / PPM;
+    const x = Math.random() * WORLD_W;
+    if (Math.abs(wrapDx(x, PAD.x)) < PAD.w / 2 + halfW + 1.5) continue;   // clear of launchpad
+    if (Math.abs(wrapDx(x, TENT.x)) < TENT.w / 2 + halfW + 1.5) continue; // clear of barracks
+    let ok = true;
+    for (const p of plants) {
+      if (Math.abs(wrapDx(x, p.x)) < p.halfW + halfW + 0.5) { ok = false; break; }
+    }
+    if (!ok) continue;
+    plants.push({ x, rects, halfW, h: height, bushy: gen === genBush });
+  }
+}
+
+function makeSoldier(cls, idx) {
+  const tank = cls >= 5;
+  let x = tank ? TENT.x + (idx % 2 === 0 ? -1 : 1) * (3.5 + idx * 1.5) : TENT.x;
+  x = ((x % WORLD_W) + WORLD_W) % WORLD_W;
+  return {
+    cls, x, vx: 0, t: 1 + Math.random(), phase: 0, alive: true,
+    hp: cls === 6 ? 3 : cls === 5 ? 2 : 1,
+    inside: !tank, hideT: 0, away: false,
+    emerged: tank, emergeDelay: 0.5 + idx * 0.35,   // tanks are parked outside
+    shootT: 1 + Math.random(), fleeDir: 0, reactT: 0, burst: 0, burstT: 0,
+    threatR: 7 + Math.random() * 6,   // fugitive: individual alarm distance
+    scareX: 0, scareT: 0,             // fugitive: memory of a nearby explosion
+    bushT: 0, bushCd: 0,              // wanderer: bush-hiding timer + cooldown
+  };
+}
+
+// bomb rule: a falling bomb only alarms a soldier when truly close in space.
+// Returns the alarming bomb, or null.
+function bombNear(s) {
+  for (const b of airBombs) {
+    if (Math.hypot(wrapDx(s.x, b.x), b.y - (groundAt(s.x) + 0.3)) < BLAST_R * 2) return b;
+  }
+  return null;
+}
+
+function fireBullet(s, muzzleY) {
+  const dxD = wrapDx(drone.x, s.x);
+  const dyD = drone.y + 0.2 - muzzleY;
+  const ang = Math.atan2(dyD, dxD);
+  bullets.push({
+    x: s.x, y: muzzleY,
+    vx: Math.cos(ang) * BULLET_SPEED,
+    vy: Math.sin(ang) * BULLET_SPEED,
+    life: WEAPON[s.cls].life,
+  });
+}
+
+const drone = { x: 4, y: 0.5, vx: 0, vy: 0, tilt: 0, throttle: 0, eff: 0, batt: 100, grounded: true };
+let impactSpeed = 0;
+let debris = [];
+let camY = 0;                   // camera offset in meters (0 = ground view)
+let shake = 0;
+
+const keys = {};
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  keys[k] = true;
+  if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) e.preventDefault();
+  if (e.key === 'Enter' && (state !== S.FLYING || won)) {
+    if (levelCleared) { level++; levelCleared = false; }
+    start();
+  }
+  if (e.key === 'Escape' && state !== S.TITLE) {
+    state = S.TITLE;
+    won = false;
+    msgEl.innerHTML = titleHTML;
+    msgEl.classList.remove('hidden');
+    hudEl.classList.add('hidden');
+    bannerEl.classList.add('hidden');
+  }
+  if (k === ' ' && state === S.FLYING && !drone.grounded && bombsLeft > 0) {
+    bombsLeft--;
+    airBombs.push({ x: drone.x, y: drone.y - 0.2, vx: drone.vx, vy: drone.vy - 1.5 });
+  }
+});
+addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+function start() {
+  drone.x = PAD.x;
+  drone.y = PAD.h;
+  drone.vx = 0; drone.vy = 0;
+  drone.tilt = 0; drone.throttle = 0; drone.eff = 0;
+  drone.batt = 100;
+  drone.grounded = true;
+  tentAlive = true;
+  padAlive = true;
+  const cfg = LEVELS[Math.min(level - 1, LEVELS.length - 1)];
+  bombConfig = cfg.bombs;
+  soldiers = [];
+  let idx = 0;
+  for (const cls of [1, 2, 3, 4, 5, 6]) {
+    let n = cfg.units[cls] || 0;
+    // past the defined levels the raids keep growing
+    if (level > LEVELS.length && (cls === 2 || cls === 3)) {
+      n = Math.min(6, n + (level - LEVELS.length));
+    }
+    for (let i = 0; i < n; i++) soldiers.push(makeSoldier(cls, idx++));
+  }
+  bullets = [];
+  hasLifted = false;
+  debris = [];
+  craters = [];
+  boomFx = null;
+  airBombs = [];
+  bombsLeft = bombConfig;
+  reloadT = 0;
+  chunks = [];
+  scatterPlants();
+  camY = 0; shake = 0;
+  windDir = Math.random() < 0.5 ? -1 : 1;
+  if (!heavyKilledLevel) {
+    windSpeed = 0;
+  } else if (level - heavyKilledLevel <= 5) {
+    windSpeed = 5 + Math.round(Math.random() * 5);    // 5..10
+  } else {
+    windSpeed = 10 + Math.round(Math.random() * 20);  // 10..30
+  }
+  won = false;
+  state = S.FLYING;
+  renderPanel();
+  msgEl.classList.add('hidden');
+  hudEl.classList.remove('hidden');
+  bannerEl.classList.add('hidden');
+}
+
+/* ---------- simulation ---------- */
+function step(dt) {
+  // debris always simulates, whatever the game state — a bomb can explode
+  // mid-flight and its wreckage must keep flying
+  for (const d of debris) {
+    d.vy -= G * dt;
+    d.x += d.vx * dt; d.y += d.vy * dt;
+    if (d.x < 0) d.x += WORLD_W;
+    if (d.x >= WORLD_W) d.x -= WORLD_W;
+    const floor = groundAt(d.x);
+    if (d.y < floor) { d.y = floor; d.vy *= -0.35; d.vx *= 0.6; }
+  }
+  // severed tree pieces fall as rigid bodies and settle where they land
+  for (let i = chunks.length - 1; i >= 0; i--) {
+    const ch = chunks[i];
+    ch.vy -= G * dt;
+    ch.dy += ch.vy * dt;
+    ch.x += ch.vx * dt;
+    if (ch.x < 0) ch.x += WORLD_W;
+    if (ch.x >= WORLD_W) ch.x -= WORLD_W;
+    const bottom = ch.minYpx / PPM + ch.dy;
+    const floor = groundAt(ch.x);
+    if (bottom <= floor) {
+      const rebased = ch.cells.map(([cx, cy]) => [cx, cy - ch.minYpx, 1, 1]);
+      let halfW = 1, hPx = 1;
+      for (const [cx, cy] of rebased) {
+        halfW = Math.max(halfW, Math.abs(cx), Math.abs(cx + 1));
+        hPx = Math.max(hPx, cy + 1);
+      }
+      plants.push({ x: ch.x, rects: rebased, halfW: halfW / PPM, h: hPx / PPM, dy: floor });
+      chunks.splice(i, 1);
+    }
+  }
+
+  if (state !== S.FLYING) return;
+
+  // shrapnel: fast-flying debris destroys the drone on contact
+  for (const d of debris) {
+    if (Math.abs(d.vx) + Math.abs(d.vy) > 2 &&
+        Math.hypot(wrapDx(d.x, drone.x), d.y - (drone.y + 0.2)) < DRONE_SPEC.hit) { detonate(); return; }
+  }
+
+  const empty = drone.batt <= 0;
+
+  // throttle input: builds while held, bleeds off when released, brake cuts fast
+  const braking = (keys['s'] || keys['arrowdown']) && !drone.grounded && drone.batt > 0;
+  drone.braking = braking;
+  if (!empty) {
+    if (keys['w'] || keys['arrowup'])        drone.throttle += THROTTLE_UP * dt;
+    else if (keys['s'] || keys['arrowdown']) drone.throttle -= THROTTLE_BRAKE * dt;
+    else                                     drone.throttle -= THROTTLE_DECAY * dt;
+    drone.throttle = Math.min(1, Math.max(0, drone.throttle));
+  } else {
+    drone.throttle = 0; // motors dead
+  }
+
+  // tilt input (only meaningful with power). While reverse-thrusting the
+  // thrust vector is flipped, so steering inverts to keep keys pointing at
+  // the direction of intended travel.
+  let steering = false;
+  const tiltDir = braking ? -1 : 1;
+  if (!empty && !drone.grounded) {
+    if (keys['a'] || keys['arrowleft'])  { drone.tilt -= tiltDir * TILT_RATE * dt; steering = true; }
+    if (keys['d'] || keys['arrowright']) { drone.tilt += tiltDir * TILT_RATE * dt; steering = true; }
+  }
+  if (!steering) {
+    // auto-level
+    const s = Math.sign(drone.tilt);
+    drone.tilt -= s * Math.min(Math.abs(drone.tilt), LEVEL_RATE * dt);
+  }
+  drone.tilt = Math.min(MAX_TILT, Math.max(-MAX_TILT, drone.tilt));
+
+  // flight controller: while banking in the air, auto-throttle up to what
+  // altitude-hold needs (T = weight / cos(tilt)), so a bank against the
+  // direction of travel actively brakes instead of coasting ballistically.
+  const SZ = DRONE_SPEC;
+  const maxThrust = SZ.twr * 9.81;
+  let effThrottle = drone.throttle;
+  if (steering && !braking && !drone.grounded && !empty) {
+    const assist = Math.min(1, (G / maxThrust) / Math.cos(drone.tilt));
+    effThrottle = Math.max(effThrottle, assist);
+  }
+  drone.eff = effThrottle;
+
+  // battery (drains on what the motors actually output — assist and
+  // reverse thrust included)
+  if (!empty) {
+    drone.batt -= (BATT_IDLE + BATT_LOAD * (effThrottle + (braking ? REV_THRUST : 0))) * dt;
+    if (drone.batt <= 0) { drone.batt = 0; drone.throttle = 0; drone.eff = 0; }
+  }
+  // parked on the launchpad -> recharge battery and reload bombs
+  const onPad = drone.grounded && padAlive && Math.abs(wrapDx(drone.x, PAD.x)) <= PAD.w / 2;
+  if (onPad) {
+    drone.batt = Math.min(100, drone.batt + RECHARGE * dt);
+    if (bombsLeft < bombConfig) {
+      reloadT += dt;
+      if (reloadT >= 1) { bombsLeft++; reloadT = 0; }
+    } else {
+      reloadT = 0;
+    }
+  } else {
+    reloadT = 0;
+  }
+
+  // forces: thrust along body axis, gravity, quadratic drag
+  // reverse thrust: while braking the props push along the negative body axis.
+  // Drag acts on airspeed — velocity relative to the wind.
+  const T = drone.eff * maxThrust - (braking ? REV_THRUST * maxThrust : 0);
+  const rvx = drone.vx - windDir * windSpeed;
+  let ax =  T * Math.sin(drone.tilt) - SZ.drag * rvx * Math.abs(rvx) - SZ.lin * rvx;
+  let ay =  T * Math.cos(drone.tilt) - G - SZ.drag * drone.vy * Math.abs(drone.vy) - SZ.lin * drone.vy;
+
+  if (drone.grounded) {
+    if (ay > 0) {
+      drone.grounded = false;          // liftoff
+    } else {
+      ay = 0; ax = 0;
+      drone.vx *= Math.max(0, 1 - 8 * dt); // ground friction
+      drone.vy = 0;
+    }
+  }
+
+  drone.vx += ax * dt;
+  drone.vy += ay * dt;
+  drone.x += drone.vx * dt;
+  drone.y += drone.vy * dt;
+
+  // horizontal wrap
+  if (drone.x < 0) drone.x += WORLD_W;
+  if (drone.x >= WORLD_W) drone.x -= WORLD_W;
+
+  if (!drone.grounded) hasLifted = true;
+
+  // soldiers: everyone waits inside the tent until the drone lifts off,
+  // then exits staggered and follows their class behavior
+  for (const s of soldiers) {
+    if (!s.alive) continue;
+
+    if (!s.emerged) {
+      if (hasLifted) {
+        s.emergeDelay -= dt;
+        if (s.emergeDelay <= 0) {
+          s.emerged = true;
+          s.inside = false;
+          s.vx = (Math.random() < 0.5 ? -1 : 1) * (2 + Math.random() * 2);
+          s.t = 0.6 + Math.random();
+        }
+      }
+      continue;
+    }
+
+    if (s.cls >= 5) {
+      // tanks: slow patrol, heavy gunnery
+      s.t -= dt;
+      if (s.t <= 0) {
+        const speed = (0.8 + Math.random() * 0.7) * (s.cls === 6 ? 0.7 : 1);
+        s.vx = Math.random() < 0.3 ? 0 : (Math.random() < 0.5 ? -1 : 1) * speed;
+        s.t = 2 + Math.random() * 2;
+      }
+      if (hasLifted) {
+        const muzzleY = groundAt(s.x) + 0.45;
+        const dist = Math.hypot(wrapDx(drone.x, s.x), drone.y + 0.2 - muzzleY);
+        if (s.cls === 5) {
+          s.shootT -= dt;
+          if (s.shootT <= 0 && dist < WEAPON[5].range && dist > 1.2) {
+            fireBullet(s, muzzleY);
+            s.shootT = 2.5;               // slow, deliberate cannon shots
+          }
+        } else {
+          if (s.burst > 0) {
+            s.burstT -= dt;
+            if (s.burstT <= 0) { fireBullet(s, muzzleY); s.burst--; s.burstT = 0.18; }
+          } else {
+            s.shootT -= dt;
+            if (s.shootT <= 0 && dist < WEAPON[6].range && dist > 1.2) { s.burst = 3; s.burstT = 0; s.shootT = 3.5; }
+          }
+        }
+      }
+    } else if (s.cls === 2) {
+      // fugitive: sprints away from the nearest threat — the drone in his
+      // (individually randomized) alarm radius, or a recent bomb blast.
+      // Committing to a direction still takes time to reverse.
+      s.reactT -= dt;
+      s.scareT -= dt;
+      // a bomb falling very close is an immediate scare
+      const nbF = bombNear(s);
+      if (nbF) {
+        s.scareX = nbF.x;
+        s.scareT = 0.3;
+      }
+      const dxDrone = wrapDx(s.x, drone.x);   // + when soldier is right of drone
+      const droneThreat = hasLifted && Math.abs(dxDrone) < s.threatR && drone.y < 12;
+      const blastThreat = s.scareT > 0;
+      if (droneThreat || blastThreat) {
+        let ref;
+        if (droneThreat && blastThreat) {
+          ref = Math.abs(wrapDx(s.x, s.scareX)) < Math.abs(dxDrone) ? s.scareX : drone.x;
+        } else {
+          ref = blastThreat ? s.scareX : drone.x;
+        }
+        const want = wrapDx(s.x, ref) >= 0 ? 1 : -1;
+        // every direction decision costs a reaction: he commits, and cannot
+        // re-decide until the cooldown expires (hesitates if caught undecided)
+        if (s.fleeDir !== want && s.reactT <= 0) { s.fleeDir = want; s.reactT = 2.0; }
+        s.vx = s.fleeDir * 5;
+      } else {
+        if (s.fleeDir !== 0) s.threatR = 7 + Math.random() * 6;  // re-roll after calming
+        s.fleeDir = 0;
+        s.vx *= Math.max(0, 1 - 4 * dt);
+      }
+    } else {
+      // classes 1, 3, 4: random walk, ducking into the tent when passing it
+      if (s.inside) {
+        s.hideT -= dt;
+        if (s.hideT <= 0) {
+          s.inside = false;
+          s.away = false;
+          s.vx = (Math.random() < 0.5 ? -1 : 1) * (2 + Math.random() * 2);
+          s.t = 0.6 + Math.random() * 1.2;
+        }
+        continue;
+      }
+      // wanderer crouched in a bush: hold still until the timer runs out,
+      // but a bomb falling close breaks cover immediately (bomb rule)
+      if (s.cls === 1 && s.bushT > 0) {
+        s.bushT -= dt;
+        s.vx = 0;
+        const nbB = bombNear(s);
+        if (nbB) {
+          s.bushT = 0;
+          s.bushCd = 2.5;
+          s.vx = (wrapDx(s.x, nbB.x) >= 0 ? 1 : -1) * 4;
+          s.t = 0.3;
+        } else if (s.bushT <= 0) {
+          s.bushCd = 2.5;
+          s.vx = (Math.random() < 0.5 ? -1 : 1) * (2 + Math.random() * 2);
+          s.t = 0.6 + Math.random() * 1.2;
+        } else {
+          continue;
+        }
+      }
+      s.bushCd -= dt;
+      s.t -= dt;
+      if (s.t <= 0) {
+        s.vx = Math.random() < 0.25 ? 0 : (Math.random() * 8 - 4);
+        s.t = 0.6 + Math.random() * 1.2;
+      }
+      // wanderers bolt from a bomb falling very close
+      const nbW = s.cls === 1 ? bombNear(s) : null;
+      if (nbW) {
+        s.vx = (wrapDx(s.x, nbW.x) >= 0 ? 1 : -1) * 4;
+        s.t = 0.3;
+      }
+      // wanderers duck into a bush they walk past
+      if (s.cls === 1 && s.bushCd <= 0 && Math.abs(s.vx) > 0.1) {
+        for (const p of plants) {
+          if (p.bushy && Math.abs(wrapDx(s.x, p.x)) < 0.3) {
+            s.bushT = 0.5 + Math.random() * 1.5;   // waits up to ~2s
+            s.x = p.x;
+            s.vx = 0;
+            break;
+          }
+        }
+      }
+      const dxT = wrapDx(s.x, TENT.x);
+      if (Math.abs(dxT) > 1.5) s.away = true;   // must leave before re-entering
+      if (tentAlive && s.away && Math.abs(dxT) < 0.4) {
+        s.inside = true;
+        s.x = TENT.x;
+        s.hideT = 1.5 + Math.random() * 2.5;
+        continue;
+      }
+      // attackers fire on the move
+      if (s.cls >= 3 && hasLifted) {
+        s.shootT -= dt;
+        const dxD = wrapDx(drone.x, s.x);
+        const dyD = drone.y + 0.2 - (groundAt(s.x) + 0.5);
+        const dist = Math.hypot(dxD, dyD);
+        if (s.shootT <= 0 && dist < WEAPON[s.cls].range && dist > 1.2) {
+          const ang = Math.atan2(dyD, dxD);
+          const spread = s.cls === 4 ? [-0.14, 0, 0.14] : [0];
+          for (const off of spread) {
+            bullets.push({
+              x: s.x, y: groundAt(s.x) + 0.5,
+              vx: Math.cos(ang + off) * BULLET_SPEED,
+              vy: Math.sin(ang + off) * BULLET_SPEED,
+              life: WEAPON[s.cls].life,
+            });
+          }
+          s.shootT = s.cls === 3 ? 2.0 : 5.0;   // 0.5 / 0.2 shots per second
+        }
+      }
+    }
+
+    s.x += s.vx * dt;
+    if (s.x < 0) s.x += WORLD_W;
+    if (s.x >= WORLD_W) s.x -= WORLD_W;
+    s.phase += Math.abs(s.vx) * dt * 2.5;
+  }
+
+  // bullets: linear flight, detonate the drone on contact
+  for (const b of bullets) {
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    b.life -= dt;
+    if (b.x < 0) b.x += WORLD_W;
+    if (b.x >= WORLD_W) b.x -= WORLD_W;
+  }
+  bullets = bullets.filter(b => b.life > 0 && b.y > groundAt(b.x));
+  for (const b of bullets) {
+    if (Math.hypot(wrapDx(b.x, drone.x), b.y - (drone.y + 0.2)) < DRONE_SPEC.hit) { detonate(); return; }
+  }
+
+  // bombs: ballistic fall, contact fuze, same blast as the warhead
+  for (let bi = airBombs.length - 1; bi >= 0; bi--) {
+    const b = airBombs[bi];
+    const brvx = b.vx - windDir * windSpeed;
+    b.vy += (-G - DRAG * b.vy * Math.abs(b.vy)) * dt;
+    b.vx += (-DRAG * brvx * Math.abs(brvx)) * dt;
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    if (b.x < 0) b.x += WORLD_W;
+    if (b.x >= WORLD_W) b.x -= WORLD_W;
+
+    let hit = b.y <= groundAt(b.x);
+    if (!hit && tentAlive && b.y <= TENT.h &&
+        Math.abs(wrapDx(b.x, TENT.x)) <= TENT.w / 2 + 0.4) hit = true;
+    if (!hit && padAlive && b.y <= PAD.h &&
+        Math.abs(wrapDx(b.x, PAD.x)) <= PAD.w / 2) hit = true;
+    if (!hit) {
+      for (const p of plants) {
+        if (Math.abs(wrapDx(b.x, p.x)) < p.halfW * 0.7 && b.y < (p.dy || 0) + p.h) { hit = true; break; }
+      }
+    }
+    if (!hit) {
+      for (const s of soldiers) {
+        const hw = s.cls === 6 ? 1.2 : s.cls === 5 ? 0.9 : 0.7;
+        if (s.alive && s.emerged && !s.inside && b.y <= groundAt(s.x) + 0.7 &&
+            Math.abs(wrapDx(b.x, s.x)) <= hw) { hit = true; break; }
+      }
+    }
+    if (hit) {
+      const bx = b.x, by = Math.max(0, b.y);
+      const bvx = b.vx, bvy = b.vy;
+      airBombs.splice(bi, 1);
+      applyBlast(bx, by, 1, bvx, bvy);
+      // nearby fugitives panic away from the explosion for a while
+      for (const s of soldiers) {
+        if (s.alive && s.cls === 2 && s.emerged &&
+            Math.abs(wrapDx(s.x, bx)) < 14) { s.scareX = bx; s.scareT = 2.5; }
+      }
+      // the bomb can take out its own drone
+      if (Math.hypot(wrapDx(drone.x, bx), drone.y - by) <= BLAST_R) { detonate(); return; }
+      if (!won && soldiers.length && soldiers.every(s => !s.alive)) {
+        won = true;   // mission done — keep flying until Enter or the drone dies
+        levelCleared = true;
+        showEnd('LEVEL ' + level + ' CLEARED',
+          'BOMB ON TARGET.', 'PRESS ENTER FOR LEVEL ' + (level + 1));
+      }
+    }
+  }
+
+  // vegetation is solid: clipping a canopy detonates the warhead
+  if (!drone.grounded) {
+    for (const p of plants) {
+      if (Math.abs(wrapDx(drone.x, p.x)) < p.halfW * 0.7 && drone.y < (p.dy || 0) + p.h) { detonate(); return; }
+    }
+  }
+
+  // warhead contact triggers: a target in the open, or the tent
+  for (const s of soldiers) {
+    const hw = s.cls === 6 ? 1.2 : s.cls === 5 ? 0.9 : 0.7;
+    if (s.alive && s.emerged && !s.inside && drone.y <= groundAt(s.x) + 0.7 &&
+        Math.abs(wrapDx(drone.x, s.x)) <= hw) { detonate(); return; }
+  }
+  if (tentAlive && !drone.grounded && drone.y <= TENT.h &&
+      Math.abs(wrapDx(drone.x, TENT.x)) <= TENT.w / 2 + 0.4) { detonate(); return; }
+
+  // ground / pad contact (only while descending)
+  const floorY = padAlive && Math.abs(wrapDx(drone.x, PAD.x)) <= PAD.w / 2 ? PAD.h : groundAt(drone.x);
+  if (!drone.grounded && drone.vy <= 0 && drone.y <= floorY) {
+    impactSpeed = Math.abs(drone.vy);
+    drone.y = floorY;
+    if (impactSpeed > CRASH_SPEED) {
+      detonate();
+      return;
+    } else {
+      drone.vy = 0;
+      drone.grounded = true;
+      drone.tilt = 0;
+      if (drone.batt <= 0 &&
+          !(padAlive && Math.abs(wrapDx(drone.x, PAD.x)) <= PAD.w / 2)) complete();
+    }
+  }
+
+  // resting on ground with an empty battery ends the flight — unless parked
+  // on the launchpad, where the battery recharges instead
+  if (drone.grounded && drone.batt <= 0 && state === S.FLYING &&
+      !(padAlive && Math.abs(wrapDx(drone.x, PAD.x)) <= PAD.w / 2)) complete();
+
+  // camera: follow only when the drone nears the top of the screen, so the
+  // ground and its targets stay visible through most of the playable band
+  const followAt = (VH * 0.85 - GROUND_Y) / PPM;
+  camY = Math.max(0, drone.y - followAt);
+}
+
+function wrapDx(a, b) {
+  let dx = a - b;
+  if (dx > WORLD_W / 2) dx -= WORLD_W;
+  if (dx < -WORLD_W / 2) dx += WORLD_W;
+  return dx;
+}
+
+// ground height at x: 0 on flat terrain, negative inside a crater bowl
+function groundAt(x) {
+  let g = 0;
+  for (const c of craters) {
+    const dx = Math.abs(wrapDx(x, c.x));
+    if (dx < 0.25) g = Math.min(g, -0.375);
+    else if (dx < 0.55) g = Math.min(g, -0.25);
+    else if (dx < 0.875) g = Math.min(g, -0.125);
+  }
+  return g;
+}
+
+function killSoldier(s, atX, bx, by, ivx, ivy) {
+  s.alive = false;
+  if (s.cls === 6 && !heavyKilledLevel) heavyKilledLevel = level;   // wind milestone
+  const tank = s.cls >= 5;
+  const n = tank ? 14 : 8;
+  // blast impulse: debris flies away from the blast center, harder when close
+  const ddx = wrapDx(atX, bx), ddy = 0.4 - by;
+  const dist = Math.hypot(ddx, ddy) || 0.001;
+  const push = 9 * Math.max(0.2, 1 - dist / (BLAST_R + 1));
+  const ux = ddx / dist, uy = ddy / dist;
+  for (let i = 0; i < n; i++) {
+    debris.push({
+      x: atX + (Math.random() - 0.5) * (tank ? 1.6 : 0.8),
+      y: 0.2 + Math.random() * 0.4,
+      vx: (Math.random() - 0.5) * (tank ? 12 : 8) + ux * push + ivx * 0.5,
+      vy: 2 + Math.random() * (tank ? 7 : 5) + uy * push + ivy * 0.5,
+      col: tank ? YELLOW : RED,   // vehicles burn vintage yellow, casualties red
+    });
+  }
+}
+
+// a circular blast at (bx, by): everything inside the radius is killed or
+// destroyed; a ground-level blast leaves a crater. Used by the drone's
+// warhead and the cat bomb alike.
+function applyBlast(bx, by, dmg = 1, ivx = 0, ivy = 0) {
+  shake = 0.8;
+  boomFx = { x: bx, y: by, age: 0 };
+
+  if (tentAlive &&
+      Math.abs(wrapDx(bx, TENT.x)) <= BLAST_R + TENT.w / 2 &&
+      by <= TENT.h + BLAST_R) {
+    tentAlive = false;
+    for (const s of soldiers) {
+      if (s.alive && (s.inside || !s.emerged)) killSoldier(s, TENT.x, bx, by, ivx, ivy);  // caught inside
+    }
+  }
+  // canopy protection is pure geometry: a tall tree detonates the drone high
+  // up, out of lethal range of the ground; a blast that reaches the ground
+  // kills whoever is under it — consistent with the crater it leaves.
+  for (const s of soldiers) {
+    const sy = groundAt(s.x) + 0.3;   // chest height on the local terrain
+    const reach = s.cls >= 5 ? 0.6 : 0.3;
+    if (s.alive && s.emerged && !s.inside &&
+        Math.hypot(wrapDx(bx, s.x), by - sy) <= BLAST_R + reach) {
+      s.hp -= dmg;
+      if (s.hp <= 0) {
+        killSoldier(s, s.x, bx, by, ivx, ivy);
+      } else {
+        // armor absorbed the hit — sparks fly, the tank keeps fighting
+        for (let i = 0; i < 4; i++) {
+          debris.push({ x: s.x + (Math.random() - 0.5), y: 0.3 + Math.random() * 0.4,
+                        vx: (Math.random() - 0.5) * 8, vy: 2 + Math.random() * 4 });
+        }
+      }
+    }
+  }
+  if (padAlive &&
+      Math.abs(wrapDx(bx, PAD.x)) <= BLAST_R + PAD.w / 2 &&
+      by <= PAD.h + BLAST_R) {
+    padAlive = false;
+    for (let i = 0; i < 8; i++) {
+      debris.push({
+        x: PAD.x + (Math.random() - 0.5) * PAD.w,
+        y: PAD.h + Math.random() * 0.3,
+        vx: (Math.random() - 0.5) * 10,
+        vy: 2 + Math.random() * 6,
+      });
+    }
+  }
+  // blast bites vegetation: only pixels inside the radius are destroyed.
+  // Surviving pixels no longer connected to the ground break off and fall.
+  plants = plants.filter(p => {
+    const pdy = p.dy || 0;
+    if (Math.abs(wrapDx(bx, p.x)) > BLAST_R + p.halfW || by > pdy + p.h + BLAST_R) return true;
+    const keep = [];
+    let destroyed = 0;
+    for (const [x, y, w, h] of p.rects) {
+      for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) {
+        const wx = p.x + (x + i + 0.5) / PPM;
+        const wy = pdy + (y + j + 0.5) / PPM;
+        if (Math.hypot(wrapDx(wx, bx), wy - by) <= BLAST_R) {
+          if (++destroyed % 4 === 0) {
+            debris.push({ x: wx, y: Math.max(0.1, wy), vx: (Math.random() - 0.5) * 10, vy: 2 + Math.random() * 6 });
+          }
+        } else {
+          keep.push([x + i, y + j, 1, 1]);
+        }
+      }
+    }
+    if (!keep.length) return false;
+    // connectivity: flood-fill from the ground row; everything unreached is severed
+    const key = c => c[0] + ',' + c[1];
+    const cellMap = new Set(keep.map(key));
+    const rooted = new Set();
+    const stack = [];
+    for (const c of keep) if (c[1] === 0) { rooted.add(key(c)); stack.push(c); }
+    while (stack.length) {
+      const [cx, cy] = stack.pop();
+      for (let dx = -1; dx <= 1; dx++) for (let dyy = -1; dyy <= 1; dyy++) {
+        if (!dx && !dyy) continue;
+        const k = (cx + dx) + ',' + (cy + dyy);
+        if (cellMap.has(k) && !rooted.has(k)) { rooted.add(k); stack.push([cx + dx, cy + dyy]); }
+      }
+    }
+    const rootedCells = [], looseSet = new Set();
+    for (const c of keep) {
+      if (rooted.has(key(c))) rootedCells.push(c);
+      else looseSet.add(key(c));
+    }
+    // group severed cells into rigid pieces that fall with gravity
+    while (looseSet.size) {
+      const first = looseSet.values().next().value;
+      looseSet.delete(first);
+      const comp = [first.split(',').map(Number)];
+      const st = [comp[0]];
+      while (st.length) {
+        const [cx, cy] = st.pop();
+        for (let dx = -1; dx <= 1; dx++) for (let dyy = -1; dyy <= 1; dyy++) {
+          const k = (cx + dx) + ',' + (cy + dyy);
+          if (looseSet.has(k)) {
+            looseSet.delete(k);
+            const cell = [cx + dx, cy + dyy];
+            comp.push(cell); st.push(cell);
+          }
+        }
+      }
+      chunks.push({
+        x: p.x, cells: comp,
+        minYpx: Math.min(...comp.map(c => c[1])),
+        dy: pdy, vy: 0,
+        vx: (Math.sign(wrapDx(p.x, bx)) || (Math.random() < 0.5 ? -1 : 1)) * (0.3 + Math.random() * 0.7),
+      });
+    }
+    if (!rootedCells.length) return false;
+    p.rects = rootedCells;
+    let halfW = 1, hPx = 1;
+    for (const [cx, cy] of rootedCells) {
+      halfW = Math.max(halfW, Math.abs(cx), Math.abs(cx + 1));
+      hPx = Math.max(hPx, cy + 1);
+    }
+    p.halfW = halfW / PPM;
+    p.h = hPx / PPM;
+    return true;
+  });
+  if (by <= BLAST_R) craters.push({ x: bx });
+
+  // wreckage inherits half the impactor's momentum: fast strikes throw
+  // debris downrange, dives splash it low and forward
+  for (let i = 0; i < 26; i++) {
+    debris.push({
+      x: bx + (Math.random() - 0.5) * BLAST_R * 2,
+      y: Math.max(0.1, by + (Math.random() - 0.5) * BLAST_R),
+      vx: (Math.random() - 0.5) * 14 + ivx * 0.5,
+      vy: 3 + Math.random() * 9 + ivy * 0.5,
+    });
+  }
+}
+
+// the drone's own warhead going off ends the flight
+function detonate() {
+  state = S.DESTROYED;
+  const hitSpeed = Math.hypot(drone.vx, drone.vy);
+  // bombs still on the rack cook off with the warhead: damage = 1 + payload
+  const dmg = 1 + bombsLeft;
+  bombsLeft = 0;
+  applyBlast(drone.x, Math.max(0, drone.y), dmg, drone.vx, drone.vy);
+
+  const survivors = soldiers.filter(s => s.alive).length;
+  if (survivors === 0) {
+    levelCleared = true;
+    showEnd('LEVEL ' + level + ' CLEARED',
+      '', 'PRESS ENTER FOR LEVEL ' + (level + 1));
+  } else {
+    showEnd('MISSION FAILED',
+      survivors + (survivors > 1 ? ' TARGETS' : ' TARGET') + ' SURVIVED.',
+      'PRESS ENTER TO RETRY');
+  }
+}
+
+function complete() {
+  state = S.COMPLETE;
+  const survivors = soldiers.filter(s => s.alive).length;
+  if (survivors === 0) {
+    showEnd('FLIGHT COMPLETE', 'BATTERY SPENT. TOUCHDOWN ' + impactSpeed.toFixed(1) + ' M/S.', 'PRESS ENTER TO FLY AGAIN');
+  } else {
+    showEnd('MISSION FAILED',
+      'BATTERY SPENT. ' + survivors + (survivors > 1 ? ' TARGETS' : ' TARGET') + ' SURVIVED.',
+      'PRESS ENTER TO RETRY');
+  }
+}
+
+
+function showEnd(title, line, prompt) {
+  msgEl.innerHTML =
+    '<div class="title">' + title + '</div>' +
+    '<div class="sub">' + line + '</div>' +
+    '<div class="sub blink">' + prompt + '</div>';
+  msgEl.classList.remove('hidden');
+  bannerEl.classList.add('hidden');
+}
+
+/* ---------- rendering ---------- */
+// static stars, in world space above ground
+const stars = [];
+for (let i = 0; i < 40; i++) {
+  stars.push({ x: Math.random() * VW, y: Math.random() * 60 });   // y = meters above ground
+}
+stars.forEach(s => s.y = Math.random() * 55 + 2);
+
+function worldToScreen(wx, wy) {
+  return {
+    x: Math.round(wx * PPM),
+    y: Math.round(VH - GROUND_Y - (wy - camY) * PPM),
+  };
+}
+
+let blinkT = 0;
+
+// stepped tilt sprites: integer fillRects only, no rotation, no anti-aliasing.
+// rects are [x, y, w, h] offsets from the drone anchor; flames are [x, y] (2px wide).
+const SPRITES = {
+  0: { body: [[-5, -2, 10, 3]],
+       props: [[-7, -3, 4, 1], [3, -3, 4, 1]],
+       flames: [[-4, 1], [2, 1]] },
+  1: { body: [[-5, -3, 5, 3], [0, -2, 5, 3]],
+       props: [[-7, -4, 4, 1], [3, -3, 4, 1]],
+       flames: [[-4, 0], [2, 1]] },
+  2: { body: [[-5, -4, 4, 3], [-1, -3, 4, 3], [3, -2, 3, 3]],
+       props: [[-7, -5, 4, 1], [3, -3, 4, 1]],
+       flames: [[-4, -1], [2, 1]] },
+  3: { body: [[-5, -6, 4, 3], [-2, -4, 4, 3], [1, -2, 4, 3]],
+       props: [[-7, -7, 4, 1], [3, -3, 4, 1]],
+       flames: [[-4, -3], [2, 1]] },
+};
+function mirrorRect(r) { return [-(r[0] + r[2]), r[1], r[2], r[3]]; }
+
+const droneCv = document.createElement('canvas');
+droneCv.width = 24; droneCv.height = 16;
+const dctx = droneCv.getContext('2d');
+
+function drawDroneSprite(g2, px, py) {
+  const step = Math.max(-3, Math.min(3, Math.round(drone.tilt / MAX_TILT * 3)));
+  const s = SPRITES[Math.abs(step)];
+  const flip = step < 0;
+  const spin = (Math.floor(blinkT * 30) % 2 === 0 && drone.eff > 0.02) ? 1 : 0;
+  g2.fillStyle = FG;
+  for (let r of s.body) {
+    if (flip) r = mirrorRect(r);
+    g2.fillRect(px + r[0], py + r[1], r[2], r[3]);
+  }
+  for (let r of s.props) {
+    if (flip) r = mirrorRect(r);
+    g2.fillRect(px + r[0], py + r[1] - spin, r[2], r[3]);
+  }
+  if (drone.eff > 0.05 && drone.batt > 0) {
+    const len = Math.round(1 + drone.eff * 3);
+    for (let f of s.flames) {
+      const fx = flip ? -(f[0] + 2) : f[0];
+      g2.fillRect(px + fx, py + f[1], 2, len);
+    }
+  }
+  if (drone.braking && drone.batt > 0) {
+    // reverse thrust: wash blows upward past the props
+    for (let f of s.flames) {
+      const fx = flip ? -(f[0] + 2) : f[0];
+      g2.fillRect(px + fx, py - 6, 2, 2);
+    }
+  }
+}
+
+function drawDrone(px, py) {
+  const k = DRONE_SPEC.k;
+  if (k === 1) { drawDroneSprite(ctx, px, py); return; }
+  dctx.clearRect(0, 0, 24, 16);
+  drawDroneSprite(dctx, 12, 10);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(droneCv, 0, 0, 24, 16,
+    px - Math.round(12 * k), py - Math.round(10 * k),
+    Math.round(24 * k), Math.round(16 * k));
+}
+
+function draw(dt) {
+  blinkT += dt;
+  ctx.fillStyle = BG;
+  ctx.fillRect(0, 0, VW, VH);
+
+  ctx.save();
+  if (shake > 0) {
+    shake = Math.max(0, shake - dt);
+    ctx.translate(Math.round((Math.random() - 0.5) * 4 * shake * 2), Math.round((Math.random() - 0.5) * 4 * shake * 2));
+  }
+
+  // stars
+  ctx.fillStyle = FG;
+  for (const s of stars) {
+    const y = Math.round(VH - GROUND_Y - (s.y - camY * 0.6) * PPM); // slight parallax
+    if (y > -2 && y < VH - GROUND_Y - 4) ctx.fillRect(Math.round(s.x), y, 1, 1);
+  }
+
+  // ground: a line plus surface marks so horizontal motion reads
+  const gy = Math.round(VH - GROUND_Y + camY * PPM);
+  if (gy < VH) {
+    ctx.fillStyle = FG;
+    ctx.fillRect(0, gy, VW, 1);
+    for (let x = 4; x < VW; x += 24) {
+      ctx.fillRect(x, gy + 5, 6, 1);
+      ctx.fillRect(x + 12, gy + 12, 3, 1);
+    }
+    // craters: punch a gap in the ground line and draw a stepped bowl
+    for (const c of craters) {
+      const cx = Math.round(c.x * PPM);
+      ctx.fillStyle = BG;
+      ctx.fillRect(cx - 7, gy, 15, 4);
+      ctx.fillStyle = FG;
+      ctx.fillRect(cx - 7, gy + 1, 3, 1);
+      ctx.fillRect(cx + 5, gy + 1, 3, 1);
+      ctx.fillRect(cx - 4, gy + 2, 2, 1);
+      ctx.fillRect(cx + 3, gy + 2, 2, 1);
+      ctx.fillRect(cx - 2, gy + 3, 5, 1);
+    }
+  }
+
+  // vegetation (background scenery), incl. settled fallen pieces
+  if (gy < VH) {
+    ctx.fillStyle = FG;
+    for (const p of plants) {
+      const px = Math.round(p.x * PPM);
+      const pgy = gy - Math.round((p.dy || 0) * PPM);
+      for (const [x, y, w, h] of p.rects) ctx.fillRect(px + x, pgy - y - h, w, h);
+    }
+    // severed pieces still falling
+    for (const ch of chunks) {
+      const px = Math.round(ch.x * PPM);
+      const base = gy - Math.round(ch.dy * PPM);
+      for (const [cx, cy] of ch.cells) ctx.fillRect(px + cx, base - cy - 1, 1, 1);
+    }
+  }
+
+  // launch pad: slab on two legs
+  if (padAlive && gy < VH) {
+    const lx = Math.round(PAD.x * PPM);
+    ctx.fillStyle = FG;
+    ctx.fillRect(lx - 8, gy - 4, 16, 2);
+    ctx.fillRect(lx - 6, gy - 2, 2, 2);
+    ctx.fillRect(lx + 4, gy - 2, 2, 2);
+  }
+
+  // tent target: stepped pixel triangle with a door
+  if (tentAlive && gy < VH) {
+    const tx = Math.round(TENT.x * PPM);
+    ctx.fillStyle = FG;
+    const rows = [2, 4, 6, 8, 10, 12, 14, 16];
+    for (let i = 0; i < rows.length; i++) {
+      const w = rows[i];
+      ctx.fillRect(tx - w / 2, gy - rows.length + i, w, 1);
+    }
+    ctx.fillStyle = BG;                      // door
+    ctx.fillRect(tx - 1, gy - 3, 3, 3);
+    ctx.fillStyle = FG;
+  }
+
+  // soldiers: tiny stick figures, 2-frame run cycle (hidden while in the tent)
+  if (state !== S.TITLE && gy < VH) {
+    ctx.fillStyle = FG;
+    for (const s of soldiers) {
+      if (!s.alive || !s.emerged || s.inside || s.bushT > 0) continue;   // concealed
+      const px = Math.round(s.x * PPM);
+      const base = gy - Math.round(groundAt(s.x) * PPM);  // stand in crater bowls
+      const dir = wrapDx(drone.x, s.x) >= 0 ? 1 : -1;
+      if (s.cls === 5) {
+        // light tank: low hull, small turret, barrel tracks the drone
+        ctx.fillRect(px - 3, base - 2, 7, 2);
+        ctx.fillRect(px - 1, base - 3, 3, 1);
+        ctx.fillRect(dir === 1 ? px + 2 : px - 3, base - 3, 2, 1);
+        continue;
+      }
+      if (s.cls === 6) {
+        // heavy tank: wide hull, tall turret; the cannon tracks the drone
+        ctx.fillRect(px - 4, base - 2, 9, 2);
+        ctx.fillRect(px - 2, base - 4, 5, 2);
+        const dyA = drone.y - (groundAt(s.x) + 0.5);
+        const ang = Math.atan2(dyA, Math.abs(wrapDx(drone.x, s.x)));
+        if (ang > 1.05) {                          // > ~60° -> near vertical
+          ctx.fillRect(px + dir * 2, base - 5, 1, 1);
+          ctx.fillRect(px + dir * 2, base - 6, 1, 1);
+        } else if (ang > 0.35) {                   // ~20°..60° -> stepped 45°
+          ctx.fillRect(px + dir * 3, base - 4, 1, 1);
+          ctx.fillRect(px + dir * 4, base - 5, 1, 1);
+        } else {                                   // level
+          ctx.fillRect(dir === 1 ? px + 3 : px - 5, base - 3, 3, 1);
+        }
+        continue;
+      }
+      ctx.fillRect(px, base - 4, 1, 1);       // head
+      ctx.fillRect(px, base - 3, 1, 2);       // torso
+      const running = Math.abs(s.vx) > 0.1 && Math.floor(s.phase) % 2 === 0;
+      if (running) {
+        ctx.fillRect(px - 1, base - 1, 1, 1); // legs apart
+        ctx.fillRect(px + 1, base - 1, 1, 1);
+      } else {
+        ctx.fillRect(px, base - 1, 1, 1);     // legs together
+      }
+      if (s.cls >= 3) {                       // gun pixel, aimed at the drone
+        ctx.fillRect(px + dir, base - 3, 1, 1);
+      }
+    }
+  }
+
+  // bullets: drawn regardless of camera height — shots must stay visible
+  // when the drone climbs and the ground scrolls off-screen
+  if (state !== S.TITLE) {
+    ctx.fillStyle = FG;
+    for (const b of bullets) {
+      const p = worldToScreen(b.x, b.y);
+      ctx.fillRect(p.x, p.y, 1, 1);
+    }
+  }
+
+  // bombs, falling nose-down (minimal Little Boy silhouette)
+  ctx.fillStyle = FG;
+  for (const b of airBombs) {
+    const p = worldToScreen(b.x, b.y);
+    ctx.fillRect(p.x - 1, p.y - 4, 1, 1);   // tail fins
+    ctx.fillRect(p.x + 1, p.y - 4, 1, 1);
+    ctx.fillRect(p.x, p.y - 3, 1, 1);       // tail cone
+    ctx.fillRect(p.x - 1, p.y - 2, 3, 2);   // body
+    ctx.fillRect(p.x, p.y, 1, 1);           // nose
+  }
+
+  // explosion flash: pixelated circle, filled then hollowed into a ring
+  if (boomFx && boomFx.age < 0.3) {
+    boomFx.age += dt;
+    const p = worldToScreen(boomFx.x, boomFx.y);
+    const r = Math.round(BLAST_R * PPM * Math.min(1, boomFx.age / 0.08) * (1 + boomFx.age));
+    const fillCircle = (radius, col) => {
+      ctx.fillStyle = col;
+      for (let dy = -radius; dy <= radius; dy++) {
+        const w = Math.floor(Math.sqrt(radius * radius - dy * dy));
+        ctx.fillRect(p.x - w, p.y - 2 + dy, w * 2 + 1, 1);
+      }
+    };
+    fillCircle(r, FG);
+    if (boomFx.age > 0.12 && r > 3) fillCircle(r - 3, BG);
+  }
+
+  // debris (crash / explosion / casualties)
+  for (const d of debris) {
+    const p = worldToScreen(d.x, d.y);
+    ctx.fillStyle = d.col || FG;
+    ctx.fillRect(p.x, p.y - 1, 2, 2);
+  }
+
+  // drone (drawn at its position and wrapped copies so it never clips at the seam)
+  if (state !== S.CRASHED && state !== S.DESTROYED) {
+    for (const wx of [drone.x - WORLD_W, drone.x, drone.x + WORLD_W]) {
+      const p = worldToScreen(wx, drone.y);
+      if (p.x < -12 || p.x > VW + 12) continue;
+      drawDrone(p.x, p.y - 3);
+    }
+  }
+
+  ctx.restore();
+
+  // HUD: aviation-style tapes and indicators
+  if (state !== S.TITLE) {
+    const TAPE_LH = 14, HALF = 7;
+
+    // left: vertical speed tape (2 m/s ticks, labels every 10),
+    // with a range bar marking the safe touchdown band (0 to -CRASH_SPEED)
+    const vs = drone.vy;
+    const baseV = Math.floor(vs / 2);
+    let linesL = [];
+    for (let i = baseV + HALF; i >= baseV - HALF; i--) {
+      const v = i * 2;
+      const band = v <= 0 && v >= -CRASH_SPEED ? '▌' : ' ';
+      linesL.push((v % 10 === 0 ? String(v).padStart(3) + ' ─┤' : '     ┤') + band);
+    }
+    tapeLEl.textContent = linesL.join('\n');
+    const fracV = vs / 2 - baseV;
+    tapeLEl.style.transform = 'translateY(calc(-50% + ' + (fracV * TAPE_LH - TAPE_LH / 2).toFixed(1) + 'px))';
+    const inBand = vs <= 0.2 && vs >= -CRASH_SPEED;
+    boxLEl.className = 'tapebox' + (inBand ? ' inband' : '') + (vs < -CRASH_SPEED ? ' blink' : '');
+    boxLEl.textContent = (vs >= 0 ? '+' : '') + vs.toFixed(0).padStart(3) + ' ▶';
+
+    // right: altitude tape (10m ticks, labels every 20m)
+    const altD = drone.y * ALT_SCALE;
+    const baseA = Math.floor(altD / 10);
+    let linesR = [];
+    for (let i = baseA + HALF; i >= baseA - HALF; i--) {
+      const v = i * 10;
+      if (v < 0) { linesR.push('       '); continue; }
+      linesR.push(v % 20 === 0 ? '├─ ' + String(v).padEnd(4) : '├');
+    }
+    tapeREl.textContent = linesR.join('\n');
+    const fracA = altD / 10 - baseA;
+    tapeREl.style.transform = 'translateY(calc(-50% + ' + (fracA * TAPE_LH - TAPE_LH / 2).toFixed(1) + 'px))';
+    boxREl.className = 'tapebox';
+    boxREl.textContent = '◀ ' + String(Math.round(altD)).padStart(4);
+
+    // top center: bank angle indicator, one tick per 10 degrees
+    const bankDeg = drone.tilt * 180 / Math.PI;
+    const slot = Math.max(-6, Math.min(6, Math.round(bankDeg / 10))) + 6;
+    bankEl.textContent =
+      '| · · | · · | · · | · · |\n' +
+      ' '.repeat(slot * 2) + '▲';
+
+    // relative wind
+    windEl.textContent = 'WIND ' + (windSpeed === 0 ? '· 0' : (windDir > 0 ? '→ ' : '← ') + windSpeed);
+
+    // below the ground band: battery + bombs left, GS and menu right
+    gsEl.textContent = 'GS ' + Math.abs(drone.vx).toFixed(0).padStart(3);
+    const battClass = drone.batt > 0 && drone.batt <= 25 && state === S.FLYING ? 'blink' : '';
+    const cells = Math.round(drone.batt / 10);
+    statEl.innerHTML =
+      '<span class="' + battClass + '">BATT ' + Math.ceil(drone.batt).toString().padStart(3) + '% ' +
+      '&#9608;'.repeat(cells) + '-'.repeat(10 - cells) + '</span>\n' +
+      'BOMB ' + bombsLeft;
+
+    // stage objectives, centered below the level indicator
+    lvlEl.textContent = 'LEVEL ' + level;
+    objEl.textContent = 'TARGETS ' + soldiers.filter(s => s.alive).length;
+
+    if (state === S.FLYING) {
+      if (drone.batt <= 0) {
+        bannerEl.textContent = 'BATTERY EMPTY';
+        bannerEl.classList.toggle('hidden', Math.floor(blinkT * 2) % 2 === 1);
+      } else if (drone.batt <= 20) {
+        bannerEl.textContent = 'BATTERY LOW';
+        bannerEl.classList.toggle('hidden', Math.floor(blinkT * 2) % 2 === 1);
+      } else {
+        bannerEl.classList.add('hidden');
+      }
+    }
+  }
+}
+
+/* ---------- temporary level testbed ---------- */
+const panelEl = document.getElementById('panel');
+function renderPanel() {
+  panelEl.innerHTML = 'TEST LEVEL' +
+    '<button data-d="-1">-</button><span>' + level + '</span><button data-d="1">+</button>';
+}
+panelEl.addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  level = Math.min(99, Math.max(1, level + +btn.dataset.d));
+  levelCleared = false;
+  renderPanel();
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  if (state === S.FLYING || won) start();   // jump straight into the chosen level
+});
+renderPanel();
+
+scatterPlants();   // title screen scenery
+
+/* ---------- main loop: fixed timestep ---------- */
+const STEP = 1 / 120;
+let last = performance.now(), acc = 0;
+function loop(now) {
+  let dt = (now - last) / 1000;
+  last = now;
+  if (dt > 0.1) dt = 0.1;
+  acc += dt;
+  while (acc >= STEP) { step(STEP); acc -= STEP; }
+  draw(dt);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

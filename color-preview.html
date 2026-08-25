@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DEPARTURE — COLOR PREVIEW</title>
+<style>
+  @font-face {
+    font-family: 'Departure Mono';
+    src: url('DepartureMono-Regular.otf') format('opentype');
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    background: #303030;
+    color: #e8e4d8;
+    font-family: 'Departure Mono', monospace;
+    -webkit-font-smoothing: none;
+    overflow: hidden;
+  }
+  #wrap { display: flex; flex-direction: column; align-items: center; padding: 20px; gap: 10px; }
+  h1 { font-size: 15px; letter-spacing: 4px; font-weight: normal; }
+  .note { font-size: 11px; letter-spacing: 2px; }
+  canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>VEHICLE DEBRIS YELLOW — PICK A NUMBER</h1>
+  <div class="note">EACH SCENE: WHITE WRECKAGE + RED CASUALTY + CANDIDATE YELLOW VEHICLE DEBRIS</div>
+  <canvas id="c"></canvas>
+</div>
+<script>
+'use strict';
+const BG = '#303030', FG = '#e8e4d8', RED = '#9e4b4b';
+
+const CANDIDATES = [
+  ['1', '#c2a24e', 'CURRENT'],
+  ['2', '#d9a514', 'MUSTARD'],
+  ['3', '#e3b341', 'GOLD'],
+  ['4', '#c78f2c', 'AMBER'],
+  ['5', '#b07d1f', 'OCHRE'],
+  ['6', '#a98307', 'OLIVE GOLD'],
+];
+
+const CELL_W = 88, CELL_H = 74, COLS = 3, SCALE = 4;
+const W = COLS * CELL_W, H = Math.ceil(CANDIDATES.length / COLS) * CELL_H + 26;
+const cv = document.getElementById('c');
+cv.width = W; cv.height = H;
+cv.style.width = (W * SCALE) + 'px';
+cv.style.height = (H * SCALE) + 'px';
+const ctx = cv.getContext('2d');
+
+// deterministic scatter so all cells show the same debris pattern
+function scatter(seed) {
+  let a = seed;
+  const rng = () => { a = (a * 1103515245 + 12345) & 0x7fffffff; return a / 0x7fffffff; };
+  const pts = [];
+  for (let i = 0; i < 14; i++) pts.push([Math.floor(rng() * 56) + 8, Math.floor(rng() * 26) + 6]);
+  return pts;
+}
+const whitePts = scatter(7).slice(0, 7);
+const redPts = scatter(13).slice(0, 4);
+const yellowPts = scatter(29).slice(0, 7);
+
+ctx.fillStyle = BG;
+ctx.fillRect(0, 0, W, H);
+ctx.font = '8px "Departure Mono"';
+
+// reference strip
+ctx.fillStyle = FG;
+ctx.fillText('BASE:', 4, 10);
+ctx.fillText('GREY BG', 66, 10);
+ctx.fillRect(46, 4, 8, 8);
+ctx.fillText('WHITE', 110, 10);
+ctx.fillStyle = RED;
+ctx.fillRect(150, 4, 8, 8);
+ctx.fillStyle = FG;
+ctx.fillText('RED', 162, 10);
+
+CANDIDATES.forEach(([num, col, name], i) => {
+  const ox = (i % COLS) * CELL_W;
+  const oy = 18 + Math.floor(i / COLS) * CELL_H;
+  // ground line + crater notch
+  ctx.fillStyle = FG;
+  ctx.fillRect(ox + 6, oy + 44, CELL_W - 12, 1);
+  ctx.fillStyle = BG;
+  ctx.fillRect(ox + 34, oy + 44, 12, 3);
+  ctx.fillStyle = FG;
+  ctx.fillRect(ox + 36, oy + 46, 8, 1);
+  // white wreckage
+  for (const [x, y] of whitePts) ctx.fillRect(ox + 6 + x, oy + 6 + y, 2, 2);
+  // red casualty debris
+  ctx.fillStyle = RED;
+  for (const [x, y] of redPts) ctx.fillRect(ox + 10 + x, oy + 10 + y, 2, 2);
+  // candidate yellow vehicle debris
+  ctx.fillStyle = col;
+  for (const [x, y] of yellowPts) ctx.fillRect(ox + 8 + x, oy + 8 + y, 2, 2);
+  // tank husk in candidate color for a bigger sample
+  ctx.fillRect(ox + 10, oy + 42, 7, 2);
+  ctx.fillRect(ox + 12, oy + 41, 3, 1);
+  // label
+  ctx.fillStyle = FG;
+  ctx.fillText(num + '  ' + name + '  ' + col.toUpperCase(), ox + 6, oy + 58);
+});
+</script>
+</body>
+</html>

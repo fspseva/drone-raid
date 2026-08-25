@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DEPARTURE — TREE PREVIEW</title>
+<style>
+  @font-face {
+    font-family: 'Departure Mono';
+    src: url('DepartureMono-Regular.otf') format('opentype');
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    background: #303030;
+    color: #e8e4d8;
+    font-family: 'Departure Mono', monospace;
+    -webkit-font-smoothing: none;
+    overflow: hidden;
+  }
+  #wrap { display: flex; flex-direction: column; align-items: center; padding: 24px; gap: 12px; }
+  h1 { font-size: 16px; letter-spacing: 4px; font-weight: normal; }
+  .note { font-size: 11px; letter-spacing: 2px; }
+  canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>TREE PREVIEW</h1>
+  <div class="note">PRESS R OR CLICK TO REGENERATE &nbsp;&#8212;&nbsp; SOLDIER SHOWN FOR SCALE</div>
+  <canvas id="c"></canvas>
+</div>
+<script>
+'use strict';
+const FG = '#e8e4d8', BG = '#303030';
+
+// seeded rng so a tree can be reproduced from one number in the game
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+// each generator returns a list of [x, y, w, h] rects, y measured UP from the
+// ground line, x centered on 0. Integer pixels only.
+
+// type A — pine: stepped irregular triangle on a short trunk
+function genPine(r) {
+  const rects = [];
+  const h = 6 + Math.floor(r() * 13);         // canopy rows, wide height range
+  const trunkH = 2 + Math.floor(r() * 2);
+  const maxW = 7 + Math.floor(h / 4);         // taller pines get wider bases
+  rects.push([0, 0, 1, trunkH]);
+  let w = 1;
+  for (let i = 0; i < h; i++) {
+    const y = trunkH + h - 1 - i;             // from top down
+    rects.push([-Math.floor(w / 2), y, w, 1]);
+    w += r() < 0.4 ? 0 : (r() < 0.8 ? 1 : 2);
+    if (r() < 0.15 && w > 3) w -= 1;          // notch
+    w = Math.min(w, maxW);
+  }
+  return rects;
+}
+
+// type B — broadleaf: bulging blob canopy on a trunk, sine profile + jitter
+function genBroadleaf(r) {
+  const rects = [];
+  const trunkH = 3 + Math.floor(r() * 7);
+  rects.push([0, 0, 1, trunkH]);
+  const rows = 4 + Math.floor(r() * 7);
+  const maxW = 5 + Math.floor(r() * 3) + (rows > 7 ? 1 : 0);  // big crowns on tall trees
+  let cx = 0;
+  for (let i = 0; i < rows; i++) {
+    const t = i / (rows - 1);                 // 0 bottom .. 1 top
+    let w = Math.round(maxW * Math.sin(Math.PI * (0.25 + 0.55 * t)));
+    if (r() < 0.4) w += r() < 0.5 ? -1 : 1;   // jitter
+    w = Math.max(2, Math.min(9, w));
+    rects.push([cx - Math.floor(w / 2), trunkH - 1 + i, w, 1]);
+    if (r() < 0.35) cx += r() < 0.5 ? -1 : 1;
+    cx = Math.max(-1, Math.min(1, cx));
+  }
+  return rects;
+}
+
+// type C — dead tree: bare trunk, sparse limbs at spread heights, upturned tips
+function genDead(r) {
+  const rects = [];
+  const h = 6 + Math.floor(r() * 12);
+  rects.push([0, 0, 1, h]);
+  let side = r() < 0.5 ? 1 : -1;
+  let by = 2 + Math.floor(r() * 2);
+  while (by < h - 2) {
+    const bl = 2 + Math.floor(r() * 3);
+    rects.push([side === 1 ? 1 : -bl, by, bl, 1]);
+    const tipH = 1 + Math.floor(r() * 2);     // limbs turn upward
+    rects.push([side * bl, by + 1, 1, tipH]);
+    side = -side;
+    by += 2 + Math.floor(r() * 3);            // spread heights apart
+  }
+  if (r() < 0.5) rects.push([-side, h - 1, 1, 1]);  // crooked top
+  return rects;
+}
+
+// type D — bush: low wide clump, no trunk, sometimes two lumps
+function genBush(r) {
+  const rects = [];
+  const rows = 2 + Math.floor(r() * 3);       // 2..4 tall
+  let w = 4 + Math.floor(r() * 5);            // 4..8 wide at the base
+  let cx = 0;
+  for (let i = 0; i < rows; i++) {
+    rects.push([cx - Math.floor(w / 2), i, w, 1]);
+    w -= 1 + Math.floor(r() * 2);
+    if (w < 2) break;
+    if (r() < 0.5) cx += r() < 0.5 ? -1 : 1;
+    cx = Math.max(-2, Math.min(2, cx));
+  }
+  if (r() < 0.35) rects.push([3 + Math.floor(r() * 2), 0, 2, 1]);  // side sprig
+  rects.push([Math.floor(r() * 3) - 1, 0, 2, 4]);  // soldier-height tuft to hide in
+  return rects;
+}
+
+const TYPES = [
+  ['A  PINE', genPine],
+  ['B  BROADLEAF', genBroadleaf],
+  ['C  DEAD', genDead],
+  ['D  BUSH', genBush],
+];
+
+const COLS = 8, CELL_W = 26, CELL_H = 30, LABEL_W = 4, SCALE = 4;
+const W = (COLS * CELL_W + 80), H = TYPES.length * CELL_H + 16;
+const cv = document.getElementById('c');
+cv.width = W; cv.height = H;
+cv.style.width = (W * SCALE) + 'px';
+cv.style.height = (H * SCALE) + 'px';
+const ctx = cv.getContext('2d');
+
+function drawTree(rects, ox, groundY) {
+  ctx.fillStyle = FG;
+  for (const [x, y, w, h] of rects) ctx.fillRect(ox + x, groundY - y - h + 1, w, h);
+}
+
+function render(seed) {
+  ctx.fillStyle = BG;
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = FG;
+  ctx.font = '8px "Departure Mono"';
+  TYPES.forEach(([label, gen], row) => {
+    const groundY = row * CELL_H + CELL_H;
+    ctx.fillStyle = FG;
+    ctx.fillText(label, 4, groundY - 8);
+    // ground line for the row
+    ctx.fillRect(70, groundY + 1, COLS * CELL_W, 1);
+    for (let i = 0; i < COLS; i++) {
+      const r = mulberry32(seed + row * 1000 + i);
+      drawTree(gen(r), 70 + i * CELL_W + CELL_W / 2, groundY);
+    }
+    // soldier for scale at row end
+    const sx = 70 + COLS * CELL_W + 8;
+    ctx.fillRect(sx, groundY - 3, 1, 1);
+    ctx.fillRect(sx, groundY - 2, 1, 2);
+    ctx.fillRect(sx, groundY, 1, 1);
+  });
+}
+
+let seed = 1;
+render(seed);
+addEventListener('keydown', e => { if (e.key.toLowerCase() === 'r') render(seed = (Math.random() * 1e9) | 0); });
+addEventListener('click', () => render(seed = (Math.random() * 1e9) | 0));
+</script>
+</body>
+</html>
