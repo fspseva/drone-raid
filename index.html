@@ -202,27 +202,24 @@
     border-radius: 50%;
     pointer-events: none;
   }
-  .ctlbtn {
-    position: absolute;
-    right: 4%;
-    width: 74px; height: 74px;
-    border-radius: 50%;
-    border: 1px solid #e8e4d8;
-    background: rgba(48, 48, 48, 0.6);
-    color: #e8e4d8;
-    font-family: inherit;
-    font-size: 20px;
+  body.touch, body.touch * {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  #zoneR { display: flex; flex-direction: column; }
+  .zhalf {
+    flex: 1;
     display: flex;
     align-items: center;
-    justify-content: center;
-    pointer-events: auto;
-    touch-action: none;
-    user-select: none;
-    padding: 0;
+    justify-content: flex-end;
+    padding-right: 6%;
+    color: rgba(232, 228, 216, 0.3);
+    font-size: 10px;
+    letter-spacing: 2px;
   }
-  #thrustBtn { bottom: 36%; }
-  #brakeBtn { bottom: 7%; }
-  .ctlbtn.on { background: #e8e4d8; color: #303030; }
+  #zhT { border-bottom: 1px dashed rgba(232, 228, 216, 0.25); }
+  .zhalf.on { color: rgba(232, 228, 216, 0.9); background: rgba(232, 228, 216, 0.12); }
   body.touch #menu { pointer-events: auto; }
   /* compact HUD + screens on touch devices */
   body.touch .tape { font-size: 10px; line-height: 10px; }
@@ -304,9 +301,11 @@
     <div id="panel"></div>
     <div id="touch">
       <div class="zone" id="zoneL"></div>
+      <div class="zone" id="zoneR">
+        <div class="zhalf" id="zhT">THRUST</div>
+        <div class="zhalf" id="zhB">BRAKE</div>
+      </div>
       <div class="stickbase hidden" id="baseL"><div class="stickknob" id="knobL"></div></div>
-      <button class="ctlbtn" id="thrustBtn">&#9650;</button>
-      <button class="ctlbtn" id="brakeBtn">&#9660;</button>
     </div>
     <div id="msg">
       <div class="titleorn">──────────────&#9660;──────────────</div>
@@ -1697,8 +1696,8 @@ if (matchMedia('(pointer: coarse)').matches) {
   const subs = msgEl.querySelectorAll('.sub');
   subs[0].innerHTML =
     'LEFT STICK&nbsp;&nbsp;BANK<br>' +
-    'RIGHT BUTTONS&nbsp;&nbsp;THRUST / BRAKE<br>' +
-    'SLIDE A BUTTON DOWN&nbsp;&nbsp;BOMB';
+    'RIGHT SIDE&nbsp;&nbsp;TOUCH HIGH = THRUST, LOW = BRAKE<br>' +
+    'SLIDE DOWN&nbsp;&nbsp;BOMB';
   subs[1].textContent = 'TAP TO START';
   titleHTML = msgEl.innerHTML;
 }
@@ -1747,45 +1746,51 @@ bindStick('zoneL', 'baseL', 'knobL',
   (dx, dy) => { keys['a'] = dx < -STICK_DEAD; keys['d'] = dx > STICK_DEAD; },
   () => { keys['a'] = false; keys['d'] = false; });
 
-// right hand: hold buttons for thrust / brake; slide a held finger down
-// past ~40px to release a bomb (re-arms when you slide back up)
-function bindHoldBtn(id, key) {
-  const el = document.getElementById(id);
-  let pid = null, sy = 0, bombed = false;
-  el.addEventListener('pointerdown', e => {
+// right hand: touch the upper half of the right zone for thrust, the lower
+// half for brake (locked at touch-start). Slide a held finger down ~40px to
+// release a bomb; it re-arms when you slide back up.
+{
+  const zoneR = document.getElementById('zoneR');
+  const zhT = document.getElementById('zhT');
+  const zhB = document.getElementById('zhB');
+  let pid = null, sy = 0, key = null, bombed = false;
+  zoneR.addEventListener('pointerdown', e => {
+    if (pid !== null) return;
     pid = e.pointerId;
-    el.setPointerCapture(pid);
+    zoneR.setPointerCapture(pid);
+    const r = zoneR.getBoundingClientRect();
+    key = (e.clientY - r.top) < r.height / 2 ? 'w' : 's';
+    (key === 'w' ? zhT : zhB).classList.add('on');
+    keys[key] = true;
     sy = e.clientY;
     bombed = false;
-    keys[key] = true;
-    el.classList.add('on');
     e.preventDefault();
-    e.stopPropagation();
   });
-  el.addEventListener('pointermove', e => {
+  zoneR.addEventListener('pointermove', e => {
     if (e.pointerId !== pid) return;
     const dy = e.clientY - sy;
     if (!bombed && dy > 40) { bombed = true; dropBomb(); }
-    if (bombed && dy < 15) bombed = false;   // re-arm for another slide
+    if (bombed && dy < 15) bombed = false;
   });
   const end = e => {
     if (e.pointerId !== pid) return;
     pid = null;
-    keys[key] = false;
-    el.classList.remove('on');
+    if (key) keys[key] = false;
+    zhT.classList.remove('on');
+    zhB.classList.remove('on');
   };
-  el.addEventListener('pointerup', end);
-  el.addEventListener('pointercancel', end);
+  zoneR.addEventListener('pointerup', end);
+  zoneR.addEventListener('pointercancel', end);
 }
-bindHoldBtn('thrustBtn', 'w');
-bindHoldBtn('brakeBtn', 's');
 document.getElementById('menu').addEventListener('click', () => {
   if (state !== S.TITLE) gotoMenu();
 });
-// tap anywhere to start / advance (touch devices)
+// tap anywhere to start / advance (touch devices). During a victory lap the
+// control zones still fly the drone — only a middle-screen tap advances.
 addEventListener('pointerdown', e => {
   if (!document.body.classList.contains('touch')) return;
   if (e.target.closest('button')) return;
+  if (state === S.FLYING && won && e.target.closest('.zone')) return;
   if (state !== S.FLYING || won) pressStart();
 });
 
