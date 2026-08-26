@@ -148,10 +148,39 @@
     bottom: 5.5%;
     left: calc(2% + env(safe-area-inset-left, 0px));
     font-size: 13px;
-    line-height: 1.6;
     letter-spacing: 1px;
     text-align: left;
     white-space: pre;
+  }
+  #bombs {
+    position: absolute;
+    bottom: 1.2%;
+    left: calc(2% + env(safe-area-inset-left, 0px));
+    font-size: 13px;
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+  /* pixel-art bomb icon: the Little Boy sprite drawn in CSS pixels */
+  .bombicon {
+    display: inline-block;
+    width: 6px;
+    height: 10px;
+    margin-left: 8px;
+    position: relative;
+    vertical-align: -1px;
+  }
+  .bombicon::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 2px; height: 2px;
+    background: #e8e4d8;
+    box-shadow:
+      4px 0 #e8e4d8,
+      2px 2px #e8e4d8,
+      0 4px #e8e4d8, 2px 4px #e8e4d8, 4px 4px #e8e4d8,
+      0 6px #e8e4d8, 2px 6px #e8e4d8, 4px 6px #e8e4d8,
+      2px 8px #e8e4d8;
   }
   #msg {
     position: absolute;
@@ -251,7 +280,8 @@
   body.touch .tapebox { font-size: 11px; padding: 1px 3px; }
   body.touch #bank { font-size: 10px; line-height: 9px; }
   body.touch #wind, body.touch #gs, body.touch #menu, body.touch #pts,
-  body.touch #drones, body.touch #lvl, body.touch #obj, body.touch #stat { font-size: 10px; }
+  body.touch #drones, body.touch #lvl, body.touch #obj, body.touch #stat,
+  body.touch #bombs { font-size: 10px; }
   body.touch #msg { gap: 8px; }
   body.touch #msg .title { font-size: 26px; letter-spacing: 6px; }
   body.touch #msg .sub { font-size: 10px; }
@@ -293,6 +323,7 @@
       <div id="gs"></div>
       <div id="menu">ESC MENU</div>
       <pre id="stat"></pre>
+      <div id="bombs"></div>
     </div>
     <div id="banner" class="hidden"></div>
     <div id="touch">
@@ -1741,8 +1772,9 @@ function draw(dt) {
     const cells = Math.round(drone.batt / 10);
     statEl.innerHTML =
       '<span class="' + battClass + '">BATT ' + Math.ceil(drone.batt).toString().padStart(3) + '% ' +
-      '&#9608;'.repeat(cells) + '-'.repeat(10 - cells) + '</span>\n' +
-      '&#9660; '.repeat(bombsLeft).trimEnd();
+      '&#9608;'.repeat(cells) + '-'.repeat(10 - cells) + '</span>';
+    document.getElementById('bombs').innerHTML =
+      bombConfig > 0 ? 'BOMB' + '<span class="bombicon"></span>'.repeat(bombsLeft) : '';
 
     // stage objectives, centered below the level indicator
     lvlEl.textContent = 'LEVEL ' + level;
