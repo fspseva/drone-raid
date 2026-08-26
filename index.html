@@ -2116,13 +2116,23 @@ function lbCell(e) {
     '<div class="lbTag">' + lbEscape(e.promo) + '</div></div></div>';
 }
 function lbVisit(url) { if (url) window.open('https://' + url, '_blank'); }
+// rows carry their destination in data-url and a delegated listener opens it —
+// never string-built inline handlers (user-supplied urls = stored XSS risk)
 function lbRow(e) {
-  return '<tr class="entry" onclick="lbVisit(\'' + lbEscape(e.url) + '\')">' +
+  return '<tr class="entry" data-url="' + lbEscape(e.url || '') + '">' +
     '<td class="rank">' + e.rank + '</td>' +
     '<td class="score">' + e.score.toLocaleString('en-US') + '</td>' +
     '<td>' + lbCell(e) + '</td>' +
     '<td class="bidc">' + lbMoney(e.bid) + '</td></tr>';
 }
+let lbOpenT = 0;   // overlays appearing mid-tap: swallow the ghost click that follows
+document.addEventListener('click', e => {
+  const tr = e.target.closest('tr.entry[data-url]');
+  if (!tr || e.target.closest('button')) return;
+  if (IS_TOUCH() && tr.closest('#lbAttract')) return;   // attract tap opens the board instead
+  if (performance.now() - lbOpenT < 400) return;
+  lbVisit(tr.dataset.url);
+});
 
 async function lbFetch() {
   try {
@@ -2174,7 +2184,7 @@ function lbAttractLeg(wrap, from, to) {
 }
 
 /* ---------- full-board overlay ---------- */
-function lbOpen() { lbRenderBoard(); lbEl.classList.remove('hidden'); }
+function lbOpen() { lbRenderBoard(); lbEl.classList.remove('hidden'); lbOpenT = performance.now(); }
 function lbClose() {
   lbEl.classList.add('hidden');
   lbEl.innerHTML = '';
@@ -2305,7 +2315,7 @@ async function lbSecured(session) {
   lbAttractInit();
   if (!you) { lbOpen(); return; }
   LB.pending = null;
-  const shareText = '#' + you.rank + ' ON THE DRONE RAID LEADERBOARD — ' +
+  LB.shareText = '#' + you.rank + ' ON THE DRONE RAID LEADERBOARD — ' +
     you.score.toLocaleString('en-US') + ' PTS. OUTRANK ME — OR BE FORGOTTEN.';
   lbEl.innerHTML = '<div class="wrap">' +
     '<div class="bigline">POSITION SECURED</div>' +
@@ -2314,15 +2324,15 @@ async function lbSecured(session) {
     '<div style="max-width:460px; margin:0 auto"><table class="lbTable" style="border-top:1px solid rgba(232,228,216,0.15)">' +
     lbRow({ ...you }) + '</table></div>' +
     '<div class="lbClose" style="display:flex; gap:10px; justify-content:center">' +
-    '<button class="lbBtn" onclick="lbShare(\'' + lbEscape(shareText) + '\')">SHARE</button>' +
+    '<button class="lbBtn" onclick="lbShare()">SHARE</button>' +
     '<button class="lbBtn" onclick="lbCopy()">COPY LINK</button>' +
     '<button class="lbBtn" onclick="lbOpen()">VIEW THE BOARD &#9654;</button></div>' +
     '<div class="mid" style="margin-top:16px; font-size:10px">YOUR PLACEMENT IS PERMANENT. HIGHER SCORES SLOT IN ABOVE YOU &#8212; WE EMAIL YOU WHEN YOU&#39;RE OUTRANKED.</div>' +
     '<div class="lbClose"><button class="lbBtn" onclick="lbClose()">&#9664; CLOSE</button></div></div>';
   lbEl.classList.remove('hidden');
 }
-function lbShare(text) {
-  if (navigator.share) navigator.share({ title: 'DRONE RAID', text, url: location.origin }).catch(() => {});
+function lbShare() {
+  if (navigator.share) navigator.share({ title: 'DRONE RAID', text: LB.shareText || '', url: location.origin }).catch(() => {});
   else lbCopy();
 }
 function lbCopy() {
@@ -2341,7 +2351,7 @@ function lbMaybeBeat() {
     '<div class="lvl">LEVEL ' + level + '</div>' +
     '<div class="kick">NEXT POSITION HELD BY</div>' +
     '<div class="cardw"><table class="lbTable" style="border-top:1px solid rgba(232,228,216,0.15)">' +
-    '<tr class="entry" onclick="lbVisit(\'' + lbEscape(next.url) + '\')"><td>' + lbCell(next) + '</td></tr></table></div>' +
+    '<tr class="entry" data-url="' + lbEscape(next.url || '') + '"><td>' + lbCell(next) + '</td></tr></table></div>' +
     '<div class="pts">+' + (next.score - score).toLocaleString('en-US') + ' PTS TO OUTRANK IT</div>' +
     '<div class="go blink">CAN YOU OUTRANK IT? ' + (IS_TOUCH() ? 'TAP' : 'PRESS ENTER') + ' TO CONTINUE</div>';
   lbBeatEl.classList.remove('hidden');

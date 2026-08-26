@@ -30,7 +30,9 @@ export async function POST(request) {
 
   const name = clean(body.name, NAME_MAX) || 'ACE';
   const promo = clean(body.promo, PROMO_MAX);
-  const url = clean(body.url, URL_MAX).replace(/^https?:\/\//, '');
+  // strict charset: the url is re-rendered on every player's screen
+  const url = clean(body.url, URL_MAX).replace(/^https?:\/\//, '')
+    .replace(/[^\w.\-\/:?=&#%~+@]/g, '');
 
   // price: outrank check is free (score-ordered); paying CLAIMS the slot —
   // minimum outprices the entry directly below the insertion point
