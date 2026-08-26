@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DRONE RAID — LEADERBOARD SIMULATION</title>
+<style>
+  @font-face {
+    font-family: 'Departure Mono';
+    src: url('DepartureMono-Regular.otf') format('opentype');
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    min-height: 100%;
+    background: #303030;
+    color: #e8e4d8;
+    font-family: 'Departure Mono', monospace;
+    -webkit-font-smoothing: none;
+  }
+  #wrap { max-width: 720px; margin: 0 auto; padding: 28px 16px; }
+  h1 { font-size: 22px; letter-spacing: 6px; font-weight: normal; text-align: center; }
+  .orn { text-align: center; font-size: 12px; margin: 6px 0 18px; }
+  .screen { display: none; }
+  .screen.on { display: block; }
+  .simnote {
+    text-align: center;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #9e4b4b;
+    margin-bottom: 18px;
+  }
+  #boardWrap {
+    height: 440px;
+    overflow-y: auto;
+    border-bottom: 1px solid rgba(232,228,216,0.25);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(232,228,216,0.4) #262626;
+  }
+  #boardWrap::-webkit-scrollbar { width: 6px; }
+  #boardWrap::-webkit-scrollbar-track { background: #262626; }
+  #boardWrap::-webkit-scrollbar-thumb { background: rgba(232,228,216,0.4); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+  th:nth-child(1) { width: 34px; }
+  th:nth-child(2) { width: 80px; }
+  th:nth-child(4) { width: 150px; }
+  th {
+    text-align: left;
+    font-weight: normal;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: rgba(232,228,216,0.55);
+    padding: 4px 6px;
+    border-bottom: 1px solid rgba(232,228,216,0.35);
+  }
+  td { padding: 8px 6px; border-bottom: 1px solid rgba(232,228,216,0.15); vertical-align: top; }
+  td.rank { width: 30px; font-size: 13px; color: rgba(232,228,216,0.55); }
+  td.av { width: 40px; }
+  .avatar { width: 28px; height: 28px; image-rendering: pixelated; display: block; }
+  tr.entry { cursor: pointer; }
+  tr.entry:hover td { background: rgba(232, 228, 216, 0.06); }
+  td.score { width: 74px; }
+  .handle { letter-spacing: 1px; display: block; }
+  .clink { font-size: 11px; color: #c2a24e; margin-left: 10px; letter-spacing: 0; }
+  .tag {
+    font-size: 11px;
+    color: rgba(232,228,216,0.7);
+    margin-top: 2px;
+    line-height: 1.5;
+    height: 17px;            /* exactly one line — every card equal */
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  td.bidc { width: 150px; text-align: right; font-size: 11px; color: rgba(232,228,216,0.7); }
+  button {
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: #e8e4d8;
+    background: #303030;
+    border: 1px solid #e8e4d8;
+    padding: 5px 10px;
+    cursor: pointer;
+  }
+  button:hover { background: #e8e4d8; color: #303030; }
+  .footer {
+    margin-top: 14px;
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: rgba(232,228,216,0.45);
+    text-align: center;
+    line-height: 1.8;
+  }
+  /* form screen */
+  .box { border: 1px solid #e8e4d8; padding: 18px; margin-top: 12px; }
+  .box h2 { font-size: 13px; letter-spacing: 3px; font-weight: normal; margin-bottom: 14px; }
+  label { display: block; font-size: 10px; letter-spacing: 2px; color: rgba(232,228,216,0.6); margin: 12px 0 4px; }
+  input {
+    width: 100%;
+    font-family: inherit;
+    font-size: 13px;
+    color: #e8e4d8;
+    background: #262626;
+    border: 1px solid rgba(232,228,216,0.4);
+    padding: 7px 8px;
+  }
+  .rule { font-size: 10px; color: rgba(232,228,216,0.55); line-height: 1.8; margin-top: 12px; }
+  .payrow { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; }
+  .minbid { font-size: 15px; }
+  .pay { font-size: 13px; padding: 10px 18px; }
+  .preview { border: 1px dashed rgba(232,228,216,0.4); padding: 10px; margin-top: 14px; font-size: 13px; }
+  /* confirmation */
+  .big { text-align: center; font-size: 20px; letter-spacing: 4px; margin: 26px 0 10px; }
+  @keyframes ablink { 50% { opacity: 0; } }
+  .ablink { animation: ablink 1.2s step-end infinite; }
+  .mid { text-align: center; font-size: 12px; line-height: 2; color: rgba(232,228,216,0.8); }
+  .center { text-align: center; margin-top: 22px; }
+  .back { margin-top: 20px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>LEADERBOARD</h1>
+  <div class="orn">──────────────&#9660;──────────────</div>
+  <div class="simnote">SIMULATION — CLICK THROUGH THE FLOW, NOTHING IS REAL</div>
+
+  <!-- SCREEN 1: the board -->
+  <div class="screen on" id="s1">
+    <div class="footer" style="margin: 0 0 12px; font-size: 10px">
+      OUTRANK THE COMPETITION &#183; CLAIM YOUR POSITION &#183; PROMOTE WHATEVER YOU WANT
+    </div>
+    <div id="boardWrap"><table id="board"></table></div>
+    <div class="center" style="display:flex; gap:10px; justify-content:center">
+      <button onclick="show(4)">VIEW THE LEVEL-START SCREEN &#9654;</button>
+      <button onclick="startAttract()">VIEW THE TITLE ATTRACT MODE &#9654;</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 5: home-screen attract mode — the title stays; underneath it a
+       3-card crop of the board auto-scrolls from the last position up to #1 -->
+  <div class="screen" id="s5">
+    <div style="text-align:center; padding:44px 0 0">
+      <div style="font-size:34px; letter-spacing:12px">DRONE RAID</div>
+      <div class="orn" style="margin:12px 0 20px">──────────&#9660;──────────</div>
+      <div style="font-size:11px; letter-spacing:2px; color:rgba(232,228,216,.7)">HI-SCORE 91,300 PTS</div>
+    </div>
+    <div class="footer" style="margin: 30px 0 8px; font-size: 10px">
+      OUTRANK THE COMPETITION &#183; CLAIM YOUR POSITION &#183; PROMOTE WHATEVER YOU WANT
+    </div>
+    <div id="attractWrap" style="height:159px; overflow:hidden; border-top:1px solid rgba(232,228,216,0.25); border-bottom:1px solid rgba(232,228,216,0.25)"><table id="attractTable"></table></div>
+    <div style="text-align:right; font-size:9px; letter-spacing:1px; color:rgba(232,228,216,.45); margin-top:5px">PRESS SPACE FOR FULL LEADERBOARD</div>
+    <div class="ablink" style="text-align:center; font-size:12px; letter-spacing:3px; margin-top:24px">PRESS ENTER TO START</div>
+    <div class="center"><button onclick="stopAttract()">&#9664; BACK TO THE BOARD</button></div>
+  </div>
+
+  <!-- SCREEN 4: level-start interstitial — the next raider to beat -->
+  <div class="screen" id="s4">
+    <div class="big" style="margin-top:40px">LEVEL 8</div>
+    <div style="width:424px; margin:22px auto 0; text-align:center">
+      <div style="font-size:10px; letter-spacing:2px; color:rgba(232,228,216,.5); margin-bottom:6px">NEXT POSITION HELD BY</div>
+      <!-- exact replica of a board row's RAIDER cell: same renderer, same entry data -->
+      <table style="border-top:1px solid rgba(232,228,216,0.15); text-align:left"><tr class="entry" id="beatRow">
+        <td id="beatCell"></td>
+      </tr></table>
+      <div id="beatPts" style="font-size:10px; letter-spacing:2px; color:rgba(232,228,216,.5); margin-top:10px"></div>
+    </div>
+    <div class="mid" style="margin-top:34px">CAN YOU OUTRANK IT? TAP TO CONTINUE</div>
+    <div class="center"><button onclick="show(1)">&#9664; BACK TO THE BOARD</button></div>
+  </div>
+
+  <!-- SCREEN 2: the outbid form -->
+  <div class="screen" id="s2">
+    <div class="box">
+      <h2 id="formTitle"></h2>
+      <label>NAME OR HANDLE (16 CHARS)</label>
+      <input id="fName" maxlength="16" placeholder="ACE / @HANDLE / BRAND">
+      <label>PROMO LINE (53 CHARS)</label>
+      <input id="fTag" maxlength="53" placeholder="Promote anything here">
+      <label>LINK (OPTIONAL) — ITS FAVICON BECOMES YOUR AVATAR</label>
+      <input id="fUrl" placeholder="https://">
+      <label>YOUR BID (USD) — BID HIGHER TO COST MORE TO CLAIM</label>
+      <input id="fBid" type="number" step="0.5">
+      <label>HOW YOU'LL LOOK IN THE RANKINGS</label>
+      <div class="preview" id="fPreview"></div>
+      <div class="payrow">
+        <span class="minbid" id="fMin"></span>
+        <div style="text-align:right">
+          <button class="pay" onclick="pay()">PAY WITH STRIPE &#9654;</button>
+          <div style="font-size:9px; letter-spacing:1px; color:rgba(232,228,216,.55); margin-top:6px">APPLE PAY &#183; GOOGLE PAY</div>
+        </div>
+      </div>
+      <div class="rule">YOUR ENTRY GOES LIVE THE MOMENT PAYMENT CONFIRMS.</div>
+      <button class="back" onclick="show(1)">&#9664; BACK</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 3: confirmation + share card -->
+  <div class="screen" id="s3">
+    <div class="big">POSITION SECURED</div>
+    <div class="mid" id="cMsg"></div>
+    <div style="max-width:460px; margin:24px auto 0">
+      <div style="font-size:10px; letter-spacing:2px; color:rgba(232,228,216,.6); text-align:center; margin-bottom:8px">
+        SPREAD THE WORD — EVERY SHARE INVITES YOUR OUTRANKER
+      </div>
+      <div id="shareCard" style="border:1px solid #e8e4d8; background:#262626; aspect-ratio:1.91; padding:22px 26px; display:flex; flex-direction:column; justify-content:space-between">
+        <div style="display:flex; justify-content:space-between; align-items:baseline">
+          <span style="font-size:12px; letter-spacing:4px">DRONE RAID</span>
+          <span style="font-size:10px; letter-spacing:2px; color:rgba(232,228,216,.55)">LEADERBOARD</span>
+        </div>
+        <div style="display:flex; gap:16px; align-items:center">
+          <span id="scPos" style="font-size:18px; color:rgba(232,228,216,.55)">#12</span>
+          <img class="avatar" id="scAv" style="width:44px; height:44px">
+          <div style="flex:1">
+            <span class="handle" id="scName" style="font-size:16px">YOU</span>
+            <div class="tag" id="scTag" style="height:auto">&nbsp;</div>
+          </div>
+          <span id="scScore" style="font-size:18px">44,500</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:10px; letter-spacing:2px">
+          <span style="color:#9e4b4b">OUTRANK ME — OR BE FORGOTTEN</span>
+          <span style="color:#c2a24e">DRONERAID.CALLMESEVA.CC</span>
+        </div>
+      </div>
+      <div class="center" style="display:flex; gap:10px; justify-content:center">
+        <button onclick="alert('SIMULATION: opens the native share sheet with the card image (Web Share API)')">SHARE</button>
+        <button onclick="alert('SIMULATION: downloads the card as PNG')">DOWNLOAD</button>
+        <button onclick="alert('SIMULATION: copies droneraid.callmeseva.cc/#raid-12 — the link unfurls into this card')">COPY LINK</button>
+      </div>
+    </div>
+    <div class="mid" style="margin-top:18px; font-size:10px">
+      YOUR PLACEMENT IS PERMANENT. HIGHER SCORES SLOT IN ABOVE YOU — WE EMAIL YOU WHEN YOU'RE OUTRANKED.
+    </div>
+    <div class="center"><button onclick="show(1)">VIEW THE BOARD &#9654;</button></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+const FLOOR = 1;     // price of an uncontested position ($1 — EUR-settled Stripe account)
+// claim price = incumbent + $0.50 or +5%, whichever is larger
+function minClaim(bid) { return Math.round((bid + Math.max(0.5, bid * 0.05)) * 100) / 100; }
+// promo lines are hard-capped at 53 chars — the exact one-line width of the card
+const NAMES = [
+  ['ACME FPV', 'Cinewhoop frames & motors — code RAID10 for 10% off', 'acmefpv.com'],
+  ['@SKYWARDEN', 'Drone Raid speedruns live every Friday 21h. Come.', 'twitch.tv/skywarden'],
+  ['KAI', 'No sponsor, no merch, just hands. Catch me.', ''],
+  ['PIXEL BAKERY', 'Two-person studio baking retro games — wishlist us', 'pixelbakery.io'],
+  ['M.', 'For Lena, who took every hi-score and never bragged', ''],
+  ['VOLTA MOTORS', 'Brushless motors tuned for micro quads. Quiet, mean.', 'volta.example'],
+  ['@NIGHTOWL', 'Insomnia clan recruiting — we raid after midnight', ''],
+  ['RETRO SUPPLY', 'Pixel fonts, palettes & CRT shaders for indie devs', 'retrosupply.example'],
+  ['DUSTY', 'Level 9 took four drones. This spot is my revenge.', ''],
+  ['CAFE ORBITA', 'Lisbon coffee — show your hi-score, free pastel', 'orbita.example'],
+  ['@PIXELWITCH', '1-bit portraits & sprites — commissions open now', 'pixelwitch.example'],
+  ['HANGAR 5', 'Crashed it? We rebuild FPV rigs while you wait', 'hangar5.example'],
+  ['TOMAS', 'I am 11 and I beat my dad 14 times in a row. Hi dad.', ''],
+  ['SYNTHDRIFT', 'New chiptune EP — unofficial Drone Raid soundtrack', 'synthdrift.example'],
+  ['@GHOSTLINE', 'No bombs since level 3. Kamikaze only. Respect it.', ''],
+  ['BYTE BURGER', 'Smash burgers stacked higher than your score. Porto', 'byteburger.example'],
+  ['LENNA K.', 'Architect by day, ace by night. I build to outlast.', ''],
+  ['THE FOUNDRY', 'Indie game co-working, Porto — first week on us', 'foundry.example'],
+  ['@ZERODRAG', 'Aerodynamics PhD. Yes, the wind model is right.', ''],
+  ['OLD PILOT', 'Flew real ones for 30 years. Still here, flying.', ''],
+];
+let entries = NAMES.map((n, i) => ({
+  score: Math.round((90000 - i * 4100) * (1 - (i % 3) * 0.01)),
+  name: n[0], tag: n[1], url: n[2],
+  bid: Math.max(5, 60 - i * 3),
+  seed: 7 + i * 9,
+}));
+let target = 1;   // position being bid on (0-based)
+let pendingRun = { score: 44500 };   // the player's fresh qualifying run (mid-board)
+const CAMPAIGN = 41200;              // score before the run — next to beat: HANGAR 5 (44,002)
+
+function money(n) { return '$' + (n % 1 ? n.toFixed(2) : n.toFixed(0)); }
+
+// one muted placeholder for everyone without a link (5x5 pixel X-quad mark)
+const PLACEHOLDER = (() => {
+  const cv = document.createElement('canvas');
+  cv.width = 5; cv.height = 5;
+  const c = cv.getContext('2d');
+  c.fillStyle = '#262626'; c.fillRect(0, 0, 5, 5);
+  c.fillStyle = 'rgba(232,228,216,0.35)';
+  [[0,0],[4,0],[1,1],[3,1],[2,2],[1,3],[3,3],[0,4],[4,4]].forEach(([x,y]) => c.fillRect(x, y, 1, 1));
+  return cv.toDataURL();
+})();
+
+// avatar = the advertiser's own favicon, borrowed from their link
+function favicon(url) {
+  return 'https://www.google.com/s2/favicons?domain=' + url.split('/')[0] + '&sz=32';
+}
+function avatarSrc(e) { return e.url ? favicon(e.url) : PLACEHOLDER; }
+
+// the RAIDER cell — single source of truth, used by the board and the level-start card
+function raiderCell(e) {
+  return '<div style="display:flex; gap:10px; align-items:center">' +
+    '<img class="avatar" src="' + avatarSrc(e) + '" onerror="this.onerror=null;this.src=PLACEHOLDER">' +
+    '<div style="flex:1; min-width:0"><span class="handle">' + e.name +
+    (e.url ? '<span class="clink">' + e.url + '</span>' : '') + '</span>' +
+    '<div class="tag">' + e.tag + '</div></div></div>';
+}
+
+function renderBoard() {
+  // where does the pending run slot in? (unlimited positions — every run fits somewhere)
+  let ghostAt = -1;
+  if (pendingRun) {
+    ghostAt = entries.findIndex(e => pendingRun.score > e.score);
+    if (ghostAt === -1) ghostAt = entries.length;   // below everyone: last position
+  }
+  let html = boardHeader();
+  let rank = 1;
+  entries.forEach((e, i) => {
+    if (i === ghostAt) { html += ghostRow(rank, i); rank++; }
+    html += entryRow(e, rank, i);
+    rank++;
+  });
+  if (ghostAt === entries.length) html += ghostRow(rank, ghostAt);
+  document.getElementById('board').innerHTML = html;
+  // keep the player's position centered in the scroll view
+  const g = document.getElementById('ghost');
+  if (g) {
+    const wrap = document.getElementById('boardWrap');
+    wrap.scrollTop = g.offsetTop - wrap.clientHeight / 2 + g.offsetHeight / 2;
+  }
+}
+
+function boardHeader() {
+  return '<tr><th>#</th><th>SCORE</th><th>RAIDER</th><th style="text-align:right">VALUE</th></tr>';
+}
+function entryRow(e, rank, i) {
+  return '<tr class="entry" onclick="visit(' + i + ')">' +
+    '<td class="rank">' + rank + '</td>' +
+    '<td class="score">' + e.score.toLocaleString('en-US') + '</td>' +
+    '<td>' + raiderCell(e) + '</td>' +
+    '<td class="bidc">' + money(e.bid) + '</td></tr>';
+}
+
+function ghostRow(rank, displaceIdx) {
+  // price outbids the raider you slot above; the very bottom costs the floor
+  const min = displaceIdx < entries.length ? minClaim(entries[displaceIdx].bid) : FLOOR;
+  return '<tr id="ghost" style="background:#e8e4d8; color:#303030">' +
+    '<td class="rank" style="color:rgba(48,48,48,0.6)">' + rank + '</td>' +
+    '<td class="score" style="color:#303030; font-size:15px">' + pendingRun.score.toLocaleString('en-US') + '</td>' +
+    '<td><div style="display:flex; gap:10px; align-items:center">' +
+    '<img class="avatar" src="' + PLACEHOLDER + '">' +
+    '<div style="flex:1; min-width:0"><span class="handle" style="color:#303030">YOUR RAID &#183; UNCLAIMED</span>' +
+    '<div class="tag" style="color:#303030">CLAIM #' + rank + ' POSITION <span style="color:#9e4b4b">OR BE FORGOTTEN</span></div></div></div></td>' +
+    '<td class="bidc"><button style="background:#303030; color:#e8e4d8; border-color:#303030; font-size:11px; letter-spacing:0.5px; padding:8px 7px; white-space:nowrap" ' +
+    'onclick="openForm(' + displaceIdx + ')">CLAIM FOR ' + money(min) + '</button></td></tr>';
+}
+
+function visit(i) {
+  if (entries[i].url) alert('SIMULATION: would open https://' + entries[i].url);
+}
+
+function show(n) {
+  if (n !== 5) stopAttractTimers();
+  for (const i of [1, 2, 3, 4, 5]) document.getElementById('s' + i).classList.toggle('on', i === n);
+  if (n === 1) renderBoard();
+  if (n === 4) {
+    // the next raider above the player's campaign score — same card as on the board
+    let next = entries.length - 1;
+    while (next > 0 && entries[next].score <= CAMPAIGN) next--;
+    document.getElementById('beatCell').innerHTML = raiderCell(entries[next]);
+    document.getElementById('beatRow').onclick = () => {
+      if (entries[next].url) window.open('https://' + entries[next].url, '_blank');
+    };
+    document.getElementById('beatPts').textContent =
+      '+' + (entries[next].score - CAMPAIGN).toLocaleString('en-US') + ' PTS TO OUTRANK IT';
+  }
+}
+
+function openForm(i) {
+  target = i;
+  document.getElementById('formTitle').textContent =
+    pendingRun.score.toLocaleString('en-US') + ' PTS OUTRANK POSITION #' + (i + 1);
+  const min = i < entries.length ? minClaim(entries[i].bid) : FLOOR;
+  document.getElementById('fMin').textContent = 'MIN BID ' + money(min);
+  const fb = document.getElementById('fBid');
+  fb.min = min; fb.value = min;
+  updatePreview();
+  show(2);
+}
+
+function updatePreview() {
+  const name = document.getElementById('fName').value || 'YOUR NAME';
+  const tag = document.getElementById('fTag').value || 'Your promo line here';
+  const url = document.getElementById('fUrl').value.replace(/^https?:\/\//, '');
+  document.getElementById('fPreview').innerHTML = raiderCell({ name, tag, url });
+}
+['fName', 'fTag', 'fUrl'].forEach(id =>
+  document.getElementById(id).addEventListener('input', updatePreview));
+
+function pay() {
+  const min = target < entries.length ? minClaim(entries[target].bid) : FLOOR;
+  let bid = parseFloat(document.getElementById('fBid').value);
+  if (!(bid >= min)) { alert('YOUR BID MUST BE AT LEAST ' + money(min)); return; }
+  const e = {
+    score: pendingRun.score,
+    name: document.getElementById('fName').value || 'YOU',
+    tag: document.getElementById('fTag').value || '(your promo line)',
+    url: document.getElementById('fUrl').value.replace(/^https?:\/\//, ''),
+    bid: Math.round(bid * 100) / 100,
+  };
+  entries.splice(target, 0, e);   // everyone below slides down — nobody falls off
+  pendingRun = null;              // the run is claimed
+  document.getElementById('scPos').textContent = '#' + (target + 1);
+  document.getElementById('scName').textContent = e.name;
+  document.getElementById('scTag').textContent = e.tag;
+  document.getElementById('scScore').textContent = e.score.toLocaleString('en-US');
+  document.getElementById('scAv').src = avatarSrc(e);
+  document.getElementById('cMsg').innerHTML =
+    'POSITION #' + (target + 1) + ' &#183; ' + money(e.bid) + ' PAID (SIMULATED)<br>' +
+    'EVERYONE BELOW YOU SLID DOWN ONE SLOT.';
+  show(3);
+}
+
+/* ---------- attract mode: title ↔ auto-scrolling board ---------- */
+// the title never leaves; the 3-card window under it ping-pongs:
+// hold at the BOTTOM (last position) → steady scroll up to #1 → hold (double)
+// → steady scroll back down → hold → … forever.
+const ATTRACT = { bottomHold: 2500, msPerPx: 5, topHold: 5000 };
+let attractTimer = null, attractRaf = null;
+
+function startAttract() {
+  show(5);
+  // rows only — no header, it's a crop of cards
+  let html = '';
+  entries.forEach((e, i) => { html += entryRow(e, i + 1, i); });
+  document.getElementById('attractTable').innerHTML = html;
+  attractCycle();
+}
+function stopAttractTimers() {
+  clearTimeout(attractTimer); cancelAnimationFrame(attractRaf);
+  attractTimer = null; attractRaf = null;
+}
+function stopAttract() { show(1); }
+
+// attract-mode keys: SPACE opens the full leaderboard, ENTER starts the game
+addEventListener('keydown', e => {
+  if (!document.getElementById('s5').classList.contains('on')) return;
+  if (e.code === 'Space') { e.preventDefault(); stopAttract(); }
+  if (e.key === 'Enter') alert('SIMULATION: would start the game');
+});
+
+function attractCycle() {
+  const wrap = document.getElementById('attractWrap');
+  wrap.scrollTop = wrap.scrollHeight;   // start at the bottom
+  attractLeg(wrap, wrap.scrollTop, 0);
+}
+// hold at the current end, then crawl to the other end, then reverse — forever
+function attractLeg(wrap, from, to) {
+  attractTimer = setTimeout(() => {
+    const dur = Math.abs(to - from) * ATTRACT.msPerPx;   // steady arcade crawl
+    const t0 = performance.now();
+    const step = now => {
+      const p = Math.min(1, (now - t0) / dur);
+      wrap.scrollTop = Math.round(from + (to - from) * p);
+      if (p < 1) attractRaf = requestAnimationFrame(step);
+      else attractLeg(wrap, to, from);
+    };
+    attractRaf = requestAnimationFrame(step);
+  }, to === 0 ? ATTRACT.bottomHold : ATTRACT.topHold);
+}
+
+renderBoard();
+</script>
+</body>
+</html>

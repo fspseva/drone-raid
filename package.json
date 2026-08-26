@@ -1,0 +1,9 @@
+{
+  "name": "drone-raid",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@neondatabase/serverless": "^0.10.4",
+    "stripe": "^17.5.0"
+  }
+}
