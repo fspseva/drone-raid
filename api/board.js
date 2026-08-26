@@ -8,6 +8,7 @@ export async function GET(request) {
   let you = null;
   const entries = rows.map((r, i) => {
     const e = {
+      id: Number(r.id),   // stable advertiser id — survives position changes
       rank: i + 1,
       name: r.name,
       promo: r.promo,

@@ -1,4 +1,4 @@
-const CACHE = 'droneraid-v2';
+const CACHE = 'droneraid-v3';
 const ASSETS = ['.', 'index.html', 'DepartureMono-Regular.otf', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -15,7 +15,9 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   // leaderboard API is always live — never cached
-  if (new URL(e.request.url).pathname.startsWith('/api/')) return;
+  const u = new URL(e.request.url);
+  if (u.pathname.startsWith('/api/')) return;
+  if (u.origin !== location.origin) return;   // analytics/CDN — never cached
   // pages: network first so updates arrive; assets: cache first for speed
   if (e.request.mode === 'navigate') {
     e.respondWith(

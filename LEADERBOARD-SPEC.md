@@ -245,6 +245,19 @@ Claims are proven, not trusted. How it works end to end:
 - Superhuman TAS-crafted input scripts remain possible (inherent to replay
   systems) — but the game must actually be beaten by the inputs submitted.
 
+## 12. Analytics (PostHog)
+
+- Snippet in index.html <head>; activated by setting `window.__PH_KEY` (phc_…,
+  public by design) + `__PH_HOST`. Hard no-op with no key and in VERIFY mode.
+- **`advertiser_click`** fires on every click of an advertiser anywhere
+  (attract window, mobile home board, full leaderboard, end-screen contender
+  cards) with `{ advertiser_id, advertiser_name, url, rank, surface }`.
+  `advertiser_id` is the STABLE database id (`entries.id`, exposed by
+  /api/board) — positions shift as raiders are outranked, the id never does.
+  Surfaces: title_attract · mobile_home_board · full_leaderboard ·
+  end_screen_card. Clicks on link-less entries still capture.
+- The service worker never caches cross-origin requests (analytics/CDN).
+
 ## 10. Open items
 
 **Build status (2026-08-26):** backend (§8) and in-game surfaces (§9) are LIVE
