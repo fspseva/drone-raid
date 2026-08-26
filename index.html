@@ -62,8 +62,8 @@
     line-height: 14px;
     white-space: pre;
   }
-  #tapeL { left: 10px; }
-  #tapeR { right: 10px; }
+  #tapeL { left: calc(10px + env(safe-area-inset-left, 0px)); }
+  #tapeR { right: calc(10px + env(safe-area-inset-right, 0px)); }
   .tapebox {
     position: absolute;
     top: 50%;
@@ -74,8 +74,8 @@
     font-size: 15px;
     white-space: pre;
   }
-  #boxL { left: 10px; }
-  #boxR { right: 10px; }
+  #boxL { left: calc(10px + env(safe-area-inset-left, 0px)); }
+  #boxR { right: calc(10px + env(safe-area-inset-right, 0px)); }
   #bank {
     position: absolute;
     top: 3.5%;
@@ -89,7 +89,7 @@
   #wind {
     position: absolute;
     top: 3.5%;
-    left: 9%;
+    left: calc(9% + env(safe-area-inset-left, 0px));
     font-size: 13px;
     letter-spacing: 1px;
   }
@@ -118,21 +118,21 @@
   #gs {
     position: absolute;
     bottom: 5.5%;
-    right: 2%;
+    right: calc(2% + env(safe-area-inset-right, 0px));
     font-size: 13px;
     letter-spacing: 1px;
   }
   #menu {
     position: absolute;
     bottom: 1.2%;
-    right: 2%;
+    right: calc(2% + env(safe-area-inset-right, 0px));
     font-size: 13px;
     letter-spacing: 1px;
   }
   #stat {
     position: absolute;
     bottom: 1.2%;
-    left: 2%;
+    left: calc(2% + env(safe-area-inset-left, 0px));
     font-size: 13px;
     line-height: 1.6;
     letter-spacing: 1px;
@@ -190,7 +190,7 @@
     display: none;
     position: absolute;
     top: 50%;
-    right: 80px;
+    right: calc(80px + env(safe-area-inset-right, 0px));
     width: 12px;
     height: 1px;
     background: rgba(232, 228, 216, 0.5);
@@ -318,10 +318,17 @@
 'use strict';
 
 /* ---------- display ---------- */
-const VW = 320, VH = 180;              // virtual resolution (px)
+// virtual resolution: height fixed, width follows the screen's aspect so the
+// map fills wide displays edge to edge (16:9 floor, ~2.4:1 cap)
+const VH = 180;
+const AR = Math.max(16 / 9, Math.min(
+  Math.max(innerWidth, innerHeight) / Math.min(innerWidth, innerHeight), 2.4));
+const VW = Math.round(VH * AR / 2) * 2;
 const PPM = 8;                          // pixels per meter (sim units)
 const ALT_SCALE = 4;                    // HUD display: soldier (4px) = 2m -> 1px = 0.5m
 const canvas = document.getElementById('game');
+canvas.width = VW;
+canvas.height = VH;
 const ctx = canvas.getContext('2d');
 const stage = document.getElementById('stage');
 const hudEl = document.getElementById('hud');
