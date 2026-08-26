@@ -377,7 +377,7 @@ const S = { TITLE: 0, FLYING: 1, CRASHED: 2, COMPLETE: 3, DESTROYED: 4 };
 let state = S.TITLE;
 let won = false;      // mission accomplished but the drone is still flying
 
-const PAD = { x: 4, w: 2.0, h: 0.5 };  // launch pad, far left (sim units)
+const PAD = { x: 4, w: 2.0, h: 1.0 };  // launch pad, raised clear of foot traffic
 const TENT = { x: WORLD_W * 0.75, w: 2.0, h: 1.25 };  // sim units
 const BLAST_R = 1.2;      // blast radius, a bit wider than the drone
 const BULLET_SPEED = 18;  // slow enough to see and dodge
@@ -1463,9 +1463,9 @@ function draw(dt) {
   if (padAlive && gy < VH) {
     const lx = Math.round(PAD.x * PPM);
     ctx.fillStyle = FG;
-    ctx.fillRect(lx - 8, gy - 4, 16, 2);
-    ctx.fillRect(lx - 6, gy - 2, 2, 2);
-    ctx.fillRect(lx + 4, gy - 2, 2, 2);
+    ctx.fillRect(lx - 8, gy - 8, 16, 2);   // deck, high enough to walk under
+    ctx.fillRect(lx - 6, gy - 6, 2, 6);    // legs
+    ctx.fillRect(lx + 4, gy - 6, 2, 6);
   }
 
   // tent target: stepped pixel triangle with a door
@@ -1609,7 +1609,7 @@ function draw(dt) {
     tapeLEl.style.transform = 'translateY(calc(-50% + ' + (fracV * TAPE_LH - TAPE_LH / 2).toFixed(1) + 'px))';
     const inBand = vs <= 0.2 && vs >= -CRASH_SPEED;
     boxLEl.className = 'tapebox' + (inBand ? ' inband' : '') + (vs < -CRASH_SPEED ? ' blink' : '');
-    boxLEl.textContent = (vs >= 0 ? '+' : '') + vs.toFixed(0).padStart(3) + ' ▶';
+    boxLEl.textContent = (inBand ? 'LAND' : (vs >= 0 ? '+' : '') + vs.toFixed(0).padStart(3)) + ' ▶';
 
     // right: altitude tape (10m ticks, labels every 20m)
     const altD = drone.y * ALT_SCALE;
