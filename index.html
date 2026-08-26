@@ -895,6 +895,7 @@ function start() {
     windSpeed = 10 + Math.round(Math.random() * 20);  // 10..30
   }
   won = false;
+  LB.pending = null;   // recording is offered at game over only
   state = S.FLYING;
   hintT = 0;
   levelT = 0;
@@ -1560,21 +1561,27 @@ function complete() {
 
 
 function showEnd(title, line, prompt) {
-  // a finished chapter is claimable on the leaderboard (campaign score so far)
-  const cleared = title.indexOf('CLEARED') !== -1;
-  const clearedLvl = cleared ? level : level - 1;
-  let lbLine = '';
-  if (score >= 100 && clearedLvl >= 1) {
-    LB.pending = { score, level: clearedLvl };
+  // recording on the leaderboard only happens at GAME OVER — mid-campaign end
+  // screens just show the contender frame (the next raider to outrank)
+  const over = title === 'GAME OVER';
+  let mid = '', lbLine = '';
+  if (over && score >= 100 && level > 1) {
+    LB.pending = { score, level: level - 1 };
+    const rows = LB.entries || [];
+    let at = rows.findIndex(e => score > e.score);
+    if (at === -1) at = rows.length;
+    line = 'FINAL SCORE ' + score.toLocaleString('en-US') + ' PTS OUTRANKS #' + (at + 1) + ' POSITION';
+    if (rows[at]) mid = lbCard(rows[at]);   // the contender currently holding that spot
     lbLine = IS_TOUCH()
       ? '<div class="sub" style="margin-top:6px"><span class="lbBtn" style="pointer-events:auto" onpointerdown="event.stopPropagation();lbOpen()">RECORD ON LEADERBOARD</span></div>'
-      : '<div class="sub" style="color:rgba(232,228,216,0.6)">L &nbsp;RECORD ON LEADERBOARD</div>';
+      : '<div class="sub" style="color:rgba(232,228,216,0.6)">PRESS L TO RECORD ON LEADERBOARD</div>';
+  } else if (!over) {
+    mid = lbBeatBlock();
   }
-  // the ad surface lives INSIDE the cleared screen: the next raider to outrank
   msgEl.innerHTML =
     '<div class="title">' + title + '</div>' +
     '<div class="sub">' + line + '</div>' +
-    (cleared ? lbBeatBlock() : '') +
+    mid +
     '<div class="sub blink">' + prompt + '</div>' + lbLine;
   msgEl.classList.remove('hidden');
   bannerEl.classList.add('hidden');
@@ -2332,18 +2339,21 @@ function lbCopy() {
   try { navigator.clipboard.writeText(location.origin); } catch (e) {}
 }
 
-/* ---------- the ad block inside the LEVEL CLEARED screen ---------- */
+/* ---------- ad cards inside the end screens ---------- */
+// bare contender card — the raider-cell replica, clickable to the advertiser
+function lbCard(e) {
+  return '<div style="width:424px; max-width:92vw; margin:0 auto; text-align:left; pointer-events:auto">' +
+    '<table class="lbTable" style="border-top:1px solid rgba(232,228,216,0.15)">' +
+    '<tr class="entry" data-url="' + lbEscape(e.url || '') + '"><td>' + lbCell(e) + '</td></tr></table></div>';
+}
+// contender frame for mid-campaign screens: the next raider above the score
 function lbBeatBlock() {
   let next = null;
   for (const e of LB.entries || []) if (e.score > score) next = e;   // lowest entry above the campaign
   if (!next) return '';
   return '<div>' +
     '<div style="font-size:10px; letter-spacing:2px; color:rgba(232,228,216,0.5); margin-bottom:6px">NEXT POSITION HELD BY</div>' +
-    '<div style="width:424px; max-width:92vw; margin:0 auto; text-align:left; pointer-events:auto">' +
-    '<table class="lbTable" style="border-top:1px solid rgba(232,228,216,0.15)">' +
-    '<tr class="entry" data-url="' + lbEscape(next.url || '') + '"><td>' + lbCell(next) + '</td></tr></table></div>' +
-    '<div style="font-size:10px; letter-spacing:2px; color:rgba(232,228,216,0.5); margin-top:8px">+' +
-    (next.score - score).toLocaleString('en-US') + ' PTS TO OUTRANK IT</div></div>';
+    lbCard(next) + '</div>';
 }
 
 /* ---------- boot ---------- */
