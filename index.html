@@ -86,10 +86,24 @@
     white-space: pre;
     text-align: left;
   }
-  #wind {
+  #pts {
     position: absolute;
     top: 3.5%;
-    left: calc(13% + env(safe-area-inset-left, 0px));
+    left: calc(12% + env(safe-area-inset-left, 0px));
+    font-size: 13px;
+    letter-spacing: 1px;
+  }
+  #drones {
+    position: absolute;
+    top: 3.5%;
+    left: calc(24% + env(safe-area-inset-left, 0px));
+    font-size: 13px;
+    letter-spacing: 1px;
+  }
+  #wind {
+    position: absolute;
+    bottom: 1.2%;
+    right: calc(2% + env(safe-area-inset-right, 0px));
     font-size: 13px;
     letter-spacing: 1px;
   }
@@ -131,7 +145,7 @@
   }
   #stat {
     position: absolute;
-    bottom: 1.2%;
+    bottom: 5.5%;
     left: calc(2% + env(safe-area-inset-left, 0px));
     font-size: 13px;
     line-height: 1.6;
@@ -247,8 +261,8 @@
   body.touch .tape { font-size: 10px; line-height: 10px; }
   body.touch .tapebox { font-size: 11px; padding: 1px 3px; }
   body.touch #bank { font-size: 10px; line-height: 9px; }
-  body.touch #wind, body.touch #gs, body.touch #menu,
-  body.touch #lvl, body.touch #obj, body.touch #stat { font-size: 10px; }
+  body.touch #wind, body.touch #gs, body.touch #menu, body.touch #pts,
+  body.touch #drones, body.touch #lvl, body.touch #obj, body.touch #stat { font-size: 10px; }
   body.touch #msg { gap: 8px; }
   body.touch #msg .title { font-size: 26px; letter-spacing: 6px; }
   body.touch #msg .sub { font-size: 10px; }
@@ -284,6 +298,8 @@
       <pre id="bank"></pre>
       <div id="lvl"></div>
       <div id="obj"></div>
+      <div id="pts"></div>
+      <div id="drones"></div>
       <div id="wind"></div>
       <div id="gs"></div>
       <div id="menu">ESC MENU</div>
@@ -457,6 +473,7 @@ try {
 // drone itself if it was expended), minus retry and time penalties
 const CLASS_VALUE = { 1: 300, 2: 450, 3: 600, 4: 750, 5: 1200, 6: 1800 };
 let score = 0;
+let lives = 5;       // drones in the campaign; destruction costs one
 let attempts = 0;    // attempts on the current level
 let levelT = 0;      // seconds flown this attempt
 let bombsUsed = 0;   // bombs dropped this attempt
@@ -656,6 +673,13 @@ addEventListener('keydown', e => {
 });
 
 function pressStart() {
+  if (lives <= 0) {   // game over -> fresh campaign
+    level = 1;
+    score = 0;
+    lives = 5;
+    attempts = 0;
+    levelCleared = false;
+  }
   if (levelCleared) { level++; levelCleared = false; attempts = 0; }
   attempts++;
   start();
@@ -1105,7 +1129,8 @@ function step(dt) {
         verdictPending = false;
         showEnd('LEVEL ' + level + ' CLEARED',
           'BOMB ON TARGET. +' + clearAward() + ' PTS.' + (recordClear(level) ? ' NEW RECORD.' : ''),
-          'PRESS ENTER FOR LEVEL ' + (level + 1));
+          lives > 0 ? 'PRESS ENTER FOR LEVEL ' + (level + 1)
+                    : 'LAST DRONE SPENT — PRESS ENTER TO RESTART');
       }
     }
   }
@@ -1114,9 +1139,13 @@ function step(dt) {
   if (verdictPending && airBombs.length === 0) {
     verdictPending = false;
     const survivors = soldiers.filter(s => s.alive).length;
-    showEnd('MISSION FAILED',
-      survivors + (survivors > 1 ? ' TARGETS' : ' TARGET') + ' SURVIVED.',
-      'PRESS ENTER TO RETRY');
+    if (lives <= 0) {
+      showEnd('GAME OVER', 'FINAL SCORE ' + score + ' PTS.', 'PRESS ENTER TO RESTART');
+    } else {
+      showEnd('MISSION FAILED',
+        survivors + (survivors > 1 ? ' TARGETS' : ' TARGET') + ' SURVIVED.',
+        'PRESS ENTER TO RETRY');
+    }
   }
 
   if (!flying) return;
@@ -1346,6 +1375,7 @@ function applyBlast(bx, by, dmg = 1, ivx = 0, ivy = 0) {
 function detonate() {
   state = S.DESTROYED;
   droneSpent = true;
+  lives--;
   const hitSpeed = Math.hypot(drone.vx, drone.vy);
   // bombs still on the rack cook off with the warhead: damage = 1 + payload
   const dmg = 1 + bombsLeft;
@@ -1357,9 +1387,12 @@ function detonate() {
     levelCleared = true;
     showEnd('LEVEL ' + level + ' CLEARED',
       '+' + clearAward() + ' PTS.' + (recordClear(level) ? ' NEW RECORD.' : ''),
-      'PRESS ENTER FOR LEVEL ' + (level + 1));
+      lives > 0 ? 'PRESS ENTER FOR LEVEL ' + (level + 1)
+                : 'LAST DRONE SPENT — PRESS ENTER TO RESTART');
   } else if (airBombs.length > 0) {
     verdictPending = true;   // bombs still falling — the level may yet clear
+  } else if (lives <= 0) {
+    showEnd('GAME OVER', 'FINAL SCORE ' + score + ' PTS.', 'PRESS ENTER TO RESTART');
   } else {
     showEnd('MISSION FAILED',
       survivors + (survivors > 1 ? ' TARGETS' : ' TARGET') + ' SURVIVED.',
@@ -1726,8 +1759,10 @@ function draw(dt) {
     if (isTouch) document.getElementById('bombHud').textContent = 'BOMB ' + bombsLeft;
 
     // stage objectives, centered below the level indicator
-    lvlEl.textContent = 'LEVEL ' + level + (score > 0 ? ' — ' + score : '');
+    lvlEl.textContent = 'LEVEL ' + level;
     objEl.textContent = 'TARGETS ' + soldiers.filter(s => s.alive).length;
+    document.getElementById('pts').textContent = score + ' PTS';
+    document.getElementById('drones').textContent = 'DRONES ' + Math.max(0, lives);
 
     if (state === S.FLYING) {
       if (drone.batt <= 0) {
