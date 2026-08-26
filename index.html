@@ -700,14 +700,16 @@ addEventListener('keydown', e => {
 });
 
 function pressStart() {
-  if (lives <= 0) {   // game over -> fresh campaign
+  // a cleared level ALWAYS advances (lives are per level), even if the last
+  // drone was spent on the clearing kamikaze; game over only without a clear
+  if (levelCleared) {
+    level++; levelCleared = false; attempts = 0; lives = 5;
+  } else if (lives <= 0) {   // game over -> fresh campaign
     level = 1;
     score = 0;
     lives = 5;
     attempts = 0;
-    levelCleared = false;
   }
-  if (levelCleared) { level++; levelCleared = false; attempts = 0; lives = 5; }
   attempts++;
   start();
 }
@@ -1156,8 +1158,7 @@ function step(dt) {
         verdictPending = false;
         showEnd('LEVEL ' + level + ' CLEARED',
           'BOMB ON TARGET. +' + clearAward() + ' PTS.' + (recordClear(level) ? ' NEW RECORD.' : ''),
-          lives > 0 ? 'PRESS ENTER FOR LEVEL ' + (level + 1)
-                    : 'LAST DRONE SPENT — PRESS ENTER TO RESTART');
+          'PRESS ENTER FOR LEVEL ' + (level + 1));
       }
     }
   }
@@ -1414,8 +1415,7 @@ function detonate() {
     levelCleared = true;
     showEnd('LEVEL ' + level + ' CLEARED',
       '+' + clearAward() + ' PTS.' + (recordClear(level) ? ' NEW RECORD.' : ''),
-      lives > 0 ? 'PRESS ENTER FOR LEVEL ' + (level + 1)
-                : 'LAST DRONE SPENT — PRESS ENTER TO RESTART');
+      'PRESS ENTER FOR LEVEL ' + (level + 1));
   } else if (airBombs.length > 0) {
     verdictPending = true;   // bombs still falling — the level may yet clear
   } else if (lives <= 0) {
