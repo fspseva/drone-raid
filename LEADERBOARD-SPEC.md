@@ -182,6 +182,14 @@ campaign score:
 
 ## 10. Open items
 
+**Build status (2026-08-26):** backend (§8) and in-game surfaces (§9) are LIVE
+on droneraid.callmeseva.cc with LIVE Stripe keys. Floor is $1 (see §2). The
+webhook→insert path is the only piece not yet exercised end-to-end — the first
+real claim is the test. Anti-fake tier 1 (signed single-use run tokens, score
+ceilings per level, minimum-elapsed-time, server-side bid recompute) enforced;
+tier 2 (seeded-RNG replay verification) not yet built. Also deferred: OG
+share-card image endpoint, share-card PNG download, outranked-email notifier.
+
 - Server-side score validation is v1-trusted (client-reported); replay validation
   is a known future option, out of scope now.
 - Promo-text moderation policy (manual review? blocklist?) — undecided.
