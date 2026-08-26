@@ -24,8 +24,10 @@ Tagline (shown at top of the board):
 - **Concurrency:** every completed payment is accepted and inserted at the position
   its score earns. Two simultaneous claims of "the same position" both land, ordered
   by their scores. No rejection path, no race condition.
-- **Gameplay-gated.** A claim is only offered for a score from a real run the player
-  just finished (v1 trusts the client score; the claim offer appears in-game only).
+- **Gameplay-gated.** A claim is only offered at GAME OVER, for the campaign
+  that just ended. The claimed score is NOT trusted: the claim carries the
+  campaign's replay (signed seed + recorded inputs) and the server re-simulates
+  it — the recomputed score is what goes on the board (see §11).
 
 ## 2. Pricing (auction)
 
@@ -71,8 +73,11 @@ Layout (from ranking-preview.html, keep exactly):
 
 ## 4. Ghost row (the player's unclaimed run)
 
-Appears in the board at the exact position the player's fresh score earns
-(also as the claim CTA after clearing a level):
+Claims exist ONLY at GAME OVER (see POINTS-AND-STAGES.md): mid-campaign end
+screens show the contender frame but no claim path. When a campaign ends, the
+GAME OVER screen offers `PRESS L TO RECORD ON LEADERBOARD` (a RECORD button on
+touch) which opens the board with the ghost row at the exact position the
+final score earns:
 - Inverted colors: background #e8e4d8, text #303030.
 - Content: placeholder avatar · `YOUR RAID · UNCLAIMED` ·
   tag `CLAIM #<rank> POSITION` + red (#9e4b4b) `OR BE FORGOTTEN`.

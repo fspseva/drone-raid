@@ -69,7 +69,13 @@ export async function issueRunToken() {
   const id = crypto.randomUUID();
   const ts = Date.now();
   await sql`INSERT INTO runs (id) VALUES (${id})`;
-  return id + '.' + ts + '.' + hmac(id + '.' + ts);
+  return { token: id + '.' + ts + '.' + hmac(id + '.' + ts), seed: runSeed(id) };
+}
+// the campaign's PRNG seed, derived from the run id — the verifier recomputes
+// it, so a replay only makes sense against the run that produced it
+export function runSeed(id) {
+  const h = crypto.createHmac('sha256', process.env.RUN_TOKEN_SECRET).update('seed:' + id).digest();
+  return h.readInt32BE(0);
 }
 export function verifyRunToken(token) {
   const p = String(token || '').split('.');

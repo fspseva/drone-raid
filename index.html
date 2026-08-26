@@ -602,6 +602,49 @@ const FG = '#e8e4d8';   // muted white
 const RED = '#9e4b4b';     // muted red — soldier casualties only
 const YELLOW = '#c2a24e';  // vintage yellow — destroyed vehicles only
 
+/* ---------- deterministic toolkit (replay verification) ----------
+   The sim must produce bit-identical results on every JS engine, so gameplay
+   code uses ONLY exact IEEE-754 ops: the seeded PRNG and polynomial math
+   below (+,-,*,/ and sqrt are exact by spec; transcendentals are not).
+   rng()/Math.sin() etc. remain ONLY for pure visuals (stars). */
+const VERIFY = typeof window !== 'undefined' && window.__VERIFY__ === true;
+let _rngState = 1234567;   // overwritten by the campaign seed before play
+function srand(s) { _rngState = s | 0; }
+function rng() {   // mulberry32 — exact 32-bit integer ops only
+  _rngState = (_rngState + 0x6D2B79F5) | 0;
+  let t = _rngState;
+  t = Math.imul(t ^ (t >>> 15), 1 | t);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+function mixSeed(seed, level, attempt) {   // campaign seed -> per-attempt stream
+  let h = seed | 0;
+  h = Math.imul(h ^ level, 0x9E3779B1);
+  h = Math.imul(h ^ attempt, 0x85EBCA77);
+  h ^= h >>> 16;
+  return h | 0;
+}
+const D_PI = 3.141592653589793, D_2PI = 6.283185307179586;
+function dSin(x) {
+  x = x - D_2PI * Math.round(x / D_2PI);
+  if (x > D_PI / 2) x = D_PI - x;
+  else if (x < -D_PI / 2) x = -D_PI - x;
+  const z = x * x;
+  return x * (1 + z * (-1 / 6 + z * (1 / 120 + z * (-1 / 5040 + z * (1 / 362880 + z * (-1 / 39916800 + z / 6227020800))))));
+}
+function dCos(x) { return dSin(x + D_PI / 2); }
+function dHypot(x, y) { return Math.sqrt(x * x + y * y); }
+function dExp(x) {   // e^x = 2^k · e^r with |r| <= ln2/2; 2^k by exact halving
+  const LN2 = 0.6931471805599453;
+  const k = Math.round(x / LN2);
+  const r = x - k * LN2;
+  let e = 1 + r * (1 + r / 2 * (1 + r / 3 * (1 + r / 4 * (1 + r / 5 * (1 + r / 6 * (1 + r / 7 * (1 + r / 8)))))));
+  let p = 1;
+  for (let i = 0; i < k; i++) p *= 2;
+  for (let i = 0; i > k; i--) p *= 0.5;
+  return e * p;
+}
+
 /* ---------- state ---------- */
 const S = { TITLE: 0, FLYING: 1, CRASHED: 2, COMPLETE: 3, DESTROYED: 4 };
 let state = S.TITLE;
@@ -695,7 +738,7 @@ function clearAward() {
   // time is the dominant factor: x3 for a blitz, decaying toward x1 for a
   // slow clear. Par time scales with the size of the raid.
   const par = 8 + 4 * soldiers.length;
-  const timeMult = 1 + 2 * Math.exp(-levelT / par);
+  const timeMult = 1 + 2 * dExp(-levelT / par);
   // efficiency is a small nudge — killing everyone is expected anyway
   const munitions = Math.max(1, bombsUsed + (droneSpent ? 1 : 0));
   const effMult = Math.min(1.3, 0.9 + 0.1 * (soldiers.length / munitions));
@@ -758,7 +801,7 @@ function genBroadleaf(r) {
   let cx = 0;
   for (let i = 0; i < rows; i++) {
     const t = i / (rows - 1);
-    let w = Math.round(maxW * Math.sin(Math.PI * (0.25 + 0.55 * t)));
+    let w = Math.round(maxW * dSin(D_PI * (0.25 + 0.55 * t)));
     if (r() < 0.4) w += r() < 0.5 ? -1 : 1;
     w = Math.max(2, Math.min(9, w));
     rects.push([cx - Math.floor(w / 2), trunkH - 1 + i, w, 1]);
@@ -805,11 +848,11 @@ function genBush(r) {
 function scatterPlants() {
   plants = [];
   const gens = [genPine, genBroadleaf, genDead, genBush, genBush]; // bushes a bit more common
-  const target = 6 + Math.floor(Math.random() * 5);
+  const target = 6 + Math.floor(rng() * 5);
   let tries = 0;
   while (plants.length < target && tries++ < 300) {
-    const gen = gens[Math.floor(Math.random() * gens.length)];
-    const rects = gen(Math.random);
+    const gen = gens[Math.floor(rng() * gens.length)];
+    const rects = gen(rng);   // shapes MUST come from the seeded stream too
     let halfW = 1, hPx = 1;
     for (const [x, y, w, h] of rects) {
       halfW = Math.max(halfW, Math.abs(x), Math.abs(x + w));
@@ -817,7 +860,7 @@ function scatterPlants() {
     }
     halfW /= PPM;
     const height = hPx / PPM;
-    const x = Math.random() * WORLD_W;
+    const x = rng() * WORLD_W;
     if (Math.abs(wrapDx(x, PAD.x)) < PAD.w / 2 + halfW + 1.5) continue;   // clear of launchpad
     if (Math.abs(wrapDx(x, TENT.x)) < TENT.w / 2 + halfW + 1.5) continue; // clear of barracks
     let ok = true;
@@ -834,12 +877,12 @@ function makeSoldier(cls, idx) {
   let x = tank ? TENT.x + (idx % 2 === 0 ? -1 : 1) * (3.5 + idx * 1.5) : TENT.x;
   x = ((x % WORLD_W) + WORLD_W) % WORLD_W;
   return {
-    cls, x, vx: 0, t: 1 + Math.random(), phase: 0, alive: true,
+    cls, x, vx: 0, t: 1 + rng(), phase: 0, alive: true,
     hp: cls === 6 ? 3 : cls === 5 ? 2 : 1,
     inside: !tank, hideT: 0, away: false,
     emerged: tank, emergeDelay: 0.5 + idx * 0.35,   // tanks are parked outside
-    shootT: 1 + Math.random(), fleeDir: 0, reactT: 0, burst: 0, burstT: 0,
-    threatR: 7 + Math.random() * 6,   // fugitive: individual alarm distance
+    shootT: 1 + rng(), fleeDir: 0, reactT: 0, burst: 0, burstT: 0,
+    threatR: 7 + rng() * 6,   // fugitive: individual alarm distance
     scareX: 0, scareT: 0,             // fugitive: memory of a nearby explosion
     bushT: 0, bushCd: 0,              // wanderer: bush-hiding timer + cooldown
   };
@@ -849,7 +892,7 @@ function makeSoldier(cls, idx) {
 // Returns the alarming bomb, or null.
 function bombNear(s) {
   for (const b of airBombs) {
-    if (Math.hypot(wrapDx(s.x, b.x), b.y - (groundAt(s.x) + 0.3)) < BLAST_R * 2) return b;
+    if (dHypot(wrapDx(s.x, b.x), b.y - (groundAt(s.x) + 0.3)) < BLAST_R * 2) return b;
   }
   return null;
 }
@@ -857,11 +900,11 @@ function bombNear(s) {
 function fireBullet(s, muzzleY) {
   const dxD = wrapDx(drone.x, s.x);
   const dyD = drone.y + 0.2 - muzzleY;
-  const ang = Math.atan2(dyD, dxD);
+  const inv = 1 / (dHypot(dxD, dyD) || 0.001);
   bullets.push({
     x: s.x, y: muzzleY,
-    vx: Math.cos(ang) * BULLET_SPEED,
-    vy: Math.sin(ang) * BULLET_SPEED,
+    vx: dxD * inv * BULLET_SPEED,
+    vy: dyD * inv * BULLET_SPEED,
     life: WEAPON[s.cls].life,
   });
 }
@@ -898,6 +941,7 @@ addEventListener('keydown', e => {
 });
 
 function pressStart() {
+  recEndAttempt();
   // a cleared level ALWAYS advances (lives are per level), even if the last
   // drone was spent on the clearing kamikaze; game over only without a clear
   if (levelCleared) {
@@ -908,8 +952,13 @@ function pressStart() {
     lives = 5;
     attempts = 0;
   }
-  // a fresh campaign gets a leaderboard run token (gameplay gate for claims)
-  if (level === 1 && attempts === 0 && score === 0) lbStartToken();
+  // a fresh campaign consumes the prefetched signed run (seed + claim token)
+  // and starts recording the replay that will prove its score
+  if (level === 1 && attempts === 0 && score === 0) {
+    if (LB.nextRun) { LB.run = LB.nextRun; LB.nextRun = null; }
+    lbPrefetchRun();
+    recBeginCampaign();
+  }
   attempts++;
   start();
 }
@@ -925,22 +974,23 @@ function gotoMenu() {
   bannerEl.classList.add('hidden');
   camY = 0;
   document.body.classList.remove('howto');
-  scatterPlants();   // a fresh home screen grows a fresh forest
-  plantsFresh = true;
+  lbHomeForest();
   lbAttractInit();   // titleHTML restore recreated the attract window
   if (IS_TOUCH()) { mHomeEl.scrollTop = 0; lbMobileHome(); }   // back to altitude
 }
 
+// input events only QUEUE the drop; it executes on the fixed step grid so the
+// exact step index is what the replay records (see the top of droneSim)
+let dropWanted = false;
 function dropBomb() {
-  if (state === S.FLYING && !drone.grounded && bombsLeft > 0) {
-    bombsLeft--;
-    bombsUsed++;
-    airBombs.push({ x: drone.x, y: drone.y - 0.2, vx: drone.vx, vy: drone.vy - 1.5 });
-  }
+  if (state === S.FLYING) dropWanted = true;
 }
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
 function start() {
+  // deterministic stream for this attempt: campaign seed + level + attempt
+  srand(mixSeed(LB.run ? LB.run.seed : 0, level, attempts));
+  recBeginAttempt();
   drone.x = PAD.x;
   drone.y = PAD.h;
   drone.vx = 0; drone.vy = 0;
@@ -970,20 +1020,19 @@ function start() {
   bombsLeft = bombConfig;
   reloadT = 0;
   chunks = [];
-  // level 1 keeps the scenery the pilot just descended into on the home
-  // screen; trees only reshuffle when the home screen refreshes
-  if (level === 1 && plantsFresh) plantsFresh = false;
-  else scatterPlants();
+  // same sub-seed => same forest: level 1 attempt 1 reproduces the exact
+  // scenery previewed on the home screen (lbHomeForest uses the same stream)
+  scatterPlants();
   document.body.classList.remove('howto');
   camY = 0; shake = 0;
   verdictPending = false;
-  windDir = Math.random() < 0.5 ? -1 : 1;
+  windDir = rng() < 0.5 ? -1 : 1;
   if (!heavyKilledLevel) {
     windSpeed = 0;
   } else if (level - heavyKilledLevel <= 5) {
-    windSpeed = 5 + Math.round(Math.random() * 5);    // 5..10
+    windSpeed = 5 + Math.round(rng() * 5);    // 5..10
   } else {
-    windSpeed = 10 + Math.round(Math.random() * 20);  // 10..30
+    windSpeed = 10 + Math.round(rng() * 20);  // 10..30
   }
   won = false;
   LB.pending = null;   // recording is offered at game over only
@@ -999,7 +1048,42 @@ function start() {
 }
 
 /* ---------- simulation ---------- */
+/* ---------- replay: recorder & playback ---------- */
+// REC captures a campaign as { l, a, d: [step*16+mask...], b: [dropStep...],
+// e: endStep } per attempt; PLAYBACK re-feeds one attempt during verification.
+const REC = { active: false, attempts: [], cur: null, lastMask: -1 };
+let PLAYBACK = null;
+let recStep = 0;   // fixed-step index within the current attempt
+function recBeginCampaign() {
+  REC.active = !VERIFY && !!LB.run;
+  REC.attempts = [];
+  REC.cur = null;
+}
+function recBeginAttempt() {
+  if (window.__TRACE__) window.__fps.push('#B:' + level + ':' + attempts + ':' + _rngState + ':' + (LB.run ? LB.run.seed : 'norun'));
+  recStep = 0;
+  REC.lastMask = -1;
+  REC.cur = REC.active || PLAYBACK ? { l: level, a: attempts, d: [], b: [] } : null;
+  if (REC.active) REC.attempts.push(REC.cur);
+}
+function recEndAttempt() {
+  if (REC.active && REC.cur) { REC.cur.e = recStep; REC.cur.h = simFingerprint(); }
+}
+// fold the sim-relevant state into a 32-bit hash (exact integer ops only) —
+// recorded at each attempt's end, re-derived and compared during verification
+function simFingerprint() {
+  let h = 0 | 0;
+  const f = v => { h = (Math.imul(h, 31) + (Math.round(v * 1e6) | 0)) | 0; };
+  f(drone.x); f(drone.y); f(drone.vx); f(drone.vy); f(drone.batt);
+  f(score); f(lives); f(level); f(bombsLeft); f(craters.length);
+  f(heavyKilledLevel); f(windSpeed * windDir);
+  for (const s of soldiers) { f(s.alive ? 1 : 0); f(s.x); }
+  return h;
+}
+
 function step(dt) {
+  recStep++;
+  if (window.__TRACE__) window.__fps.push(recStep + ':' + simFingerprint() + ':' + _rngState + ':' + [drone.x, drone.y, drone.vx, drone.vy, drone.throttle, drone.tilt].map(v => v.toFixed(9)).join(','));
   // debris always simulates, whatever the game state — a bomb can explode
   // mid-flight and its wreckage must keep flying
   for (const d of debris) {
@@ -1041,20 +1125,48 @@ function step(dt) {
   droneSim: {
   if (!flying) break droneSim;
 
+  // resolved control intents — live keys while playing, the recorded mask
+  // while a replay is being verified. Bit layout: 1 L · 2 R · 4 thrust · 8 brake
+  let inMask;
+  if (PLAYBACK) {
+    const d = PLAYBACK.cur.d;
+    while (PLAYBACK.di < d.length && (d[PLAYBACK.di] >> 4) === recStep) {
+      PLAYBACK.mask = d[PLAYBACK.di] & 15; PLAYBACK.di++;
+    }
+    inMask = PLAYBACK.mask;
+    if (PLAYBACK.drops.has(recStep)) dropWanted = true;
+  } else {
+    inMask = ((keys['a'] || keys['arrowleft']) ? 1 : 0) | ((keys['d'] || keys['arrowright']) ? 2 : 0) |
+             ((keys['w'] || keys['arrowup']) ? 4 : 0) | ((keys['s'] || keys['arrowdown']) ? 8 : 0);
+    if (REC.cur && inMask !== REC.lastMask) { REC.cur.d.push(recStep * 16 + inMask); REC.lastMask = inMask; }
+  }
+  const inL = !!(inMask & 1), inR = !!(inMask & 2), inU = !!(inMask & 4), inD = !!(inMask & 8);
+
+  // consume a queued bomb drop on the step grid
+  if (dropWanted) {
+    dropWanted = false;
+    if (!drone.grounded && bombsLeft > 0) {
+      bombsLeft--;
+      bombsUsed++;
+      airBombs.push({ x: drone.x, y: drone.y - 0.2, vx: drone.vx, vy: drone.vy - 1.5 });
+      if (REC.cur && !PLAYBACK) REC.cur.b.push(recStep);
+    }
+  }
+
   // shrapnel: fast-flying debris destroys the drone on contact
   for (const d of debris) {
     if (Math.abs(d.vx) + Math.abs(d.vy) > 2 &&
-        Math.hypot(wrapDx(d.x, drone.x), d.y - (drone.y + 0.2)) < DRONE_SPEC.hit) { detonate(); return; }
+        dHypot(wrapDx(d.x, drone.x), d.y - (drone.y + 0.2)) < DRONE_SPEC.hit) { detonate(); return; }
   }
 
   const empty = drone.batt <= 0;
 
   // throttle input: builds while held, bleeds off when released, brake cuts fast
-  const braking = (keys['s'] || keys['arrowdown']) && !drone.grounded && drone.batt > 0;
+  const braking = inD && !drone.grounded && drone.batt > 0;
   drone.braking = braking;
   if (!empty) {
-    if (keys['w'] || keys['arrowup'])        drone.throttle += THROTTLE_UP * dt;
-    else if (keys['s'] || keys['arrowdown']) drone.throttle -= THROTTLE_BRAKE * dt;
+    if (inU)      drone.throttle += THROTTLE_UP * dt;
+    else if (inD) drone.throttle -= THROTTLE_BRAKE * dt;
     else                                     drone.throttle -= THROTTLE_DECAY * dt;
     drone.throttle = Math.min(1, Math.max(0, drone.throttle));
   } else {
@@ -1067,8 +1179,8 @@ function step(dt) {
   let steering = false;
   const tiltDir = braking ? -1 : 1;
   if (!empty && !drone.grounded) {
-    if (keys['a'] || keys['arrowleft'])  { drone.tilt -= tiltDir * TILT_RATE * dt; steering = true; }
-    if (keys['d'] || keys['arrowright']) { drone.tilt += tiltDir * TILT_RATE * dt; steering = true; }
+    if (inL) { drone.tilt -= tiltDir * TILT_RATE * dt; steering = true; }
+    if (inR) { drone.tilt += tiltDir * TILT_RATE * dt; steering = true; }
   }
   if (!steering) {
     // auto-level
@@ -1084,7 +1196,7 @@ function step(dt) {
   const maxThrust = SZ.twr * 9.81;
   let effThrottle = drone.throttle;
   if (steering && !braking && !drone.grounded && !empty) {
-    const assist = Math.min(1, (G / maxThrust) / Math.cos(drone.tilt));
+    const assist = Math.min(1, (G / maxThrust) / dCos(drone.tilt));
     effThrottle = Math.max(effThrottle, assist);
   }
   drone.eff = effThrottle;
@@ -1114,8 +1226,8 @@ function step(dt) {
   // Drag acts on airspeed — velocity relative to the wind.
   const T = drone.eff * maxThrust - (braking ? REV_THRUST * maxThrust : 0);
   const rvx = drone.vx - windDir * windSpeed;
-  let ax =  T * Math.sin(drone.tilt) - SZ.drag * rvx * Math.abs(rvx) - SZ.lin * rvx;
-  let ay =  T * Math.cos(drone.tilt) - G - SZ.drag * drone.vy * Math.abs(drone.vy) - SZ.lin * drone.vy;
+  let ax =  T * dSin(drone.tilt) - SZ.drag * rvx * Math.abs(rvx) - SZ.lin * rvx;
+  let ay =  T * dCos(drone.tilt) - G - SZ.drag * drone.vy * Math.abs(drone.vy) - SZ.lin * drone.vy;
 
   if (drone.grounded) {
     if (ay > 0) {
@@ -1150,8 +1262,8 @@ function step(dt) {
         if (s.emergeDelay <= 0) {
           s.emerged = true;
           s.inside = false;
-          s.vx = (Math.random() < 0.5 ? -1 : 1) * (2 + Math.random() * 2);
-          s.t = 0.6 + Math.random();
+          s.vx = (rng() < 0.5 ? -1 : 1) * (2 + rng() * 2);
+          s.t = 0.6 + rng();
         }
       }
       continue;
@@ -1161,13 +1273,13 @@ function step(dt) {
       // tanks: slow patrol, heavy gunnery
       s.t -= dt;
       if (s.t <= 0) {
-        const speed = (0.8 + Math.random() * 0.7) * (s.cls === 6 ? 0.7 : 1);
-        s.vx = Math.random() < 0.3 ? 0 : (Math.random() < 0.5 ? -1 : 1) * speed;
-        s.t = 2 + Math.random() * 2;
+        const speed = (0.8 + rng() * 0.7) * (s.cls === 6 ? 0.7 : 1);
+        s.vx = rng() < 0.3 ? 0 : (rng() < 0.5 ? -1 : 1) * speed;
+        s.t = 2 + rng() * 2;
       }
       if (hasLifted && flying) {
         const muzzleY = groundAt(s.x) + 0.45;
-        const dist = Math.hypot(wrapDx(drone.x, s.x), drone.y + 0.2 - muzzleY);
+        const dist = dHypot(wrapDx(drone.x, s.x), drone.y + 0.2 - muzzleY);
         if (s.cls === 5) {
           s.shootT -= dt;
           if (s.shootT <= 0 && dist < WEAPON[5].range && dist > 1.2) {
@@ -1212,7 +1324,7 @@ function step(dt) {
         if (s.fleeDir !== want && s.reactT <= 0) { s.fleeDir = want; s.reactT = 2.0; }
         s.vx = s.fleeDir * 5;
       } else {
-        if (s.fleeDir !== 0) s.threatR = 7 + Math.random() * 6;  // re-roll after calming
+        if (s.fleeDir !== 0) s.threatR = 7 + rng() * 6;  // re-roll after calming
         s.fleeDir = 0;
         s.vx *= Math.max(0, 1 - 4 * dt);
       }
@@ -1223,8 +1335,8 @@ function step(dt) {
         if (s.hideT <= 0) {
           s.inside = false;
           s.away = false;
-          s.vx = (Math.random() < 0.5 ? -1 : 1) * (2 + Math.random() * 2);
-          s.t = 0.6 + Math.random() * 1.2;
+          s.vx = (rng() < 0.5 ? -1 : 1) * (2 + rng() * 2);
+          s.t = 0.6 + rng() * 1.2;
         }
         continue;
       }
@@ -1241,8 +1353,8 @@ function step(dt) {
           s.t = 0.3;
         } else if (s.bushT <= 0) {
           s.bushCd = 2.5;
-          s.vx = (Math.random() < 0.5 ? -1 : 1) * (2 + Math.random() * 2);
-          s.t = 0.6 + Math.random() * 1.2;
+          s.vx = (rng() < 0.5 ? -1 : 1) * (2 + rng() * 2);
+          s.t = 0.6 + rng() * 1.2;
         } else {
           continue;
         }
@@ -1250,8 +1362,8 @@ function step(dt) {
       s.bushCd -= dt;
       s.t -= dt;
       if (s.t <= 0) {
-        s.vx = Math.random() < 0.25 ? 0 : (Math.random() * 8 - 4);
-        s.t = 0.6 + Math.random() * 1.2;
+        s.vx = rng() < 0.25 ? 0 : (rng() * 8 - 4);
+        s.t = 0.6 + rng() * 1.2;
       }
       // wanderers bolt from a bomb falling very close
       const nbW = s.cls === 1 ? bombNear(s) : null;
@@ -1263,7 +1375,7 @@ function step(dt) {
       if (s.cls === 1 && s.bushCd <= 0 && Math.abs(s.vx) > 0.1) {
         for (const p of plants) {
           if (p.bushy && Math.abs(wrapDx(s.x, p.x)) < 0.3) {
-            s.bushT = 0.5 + Math.random() * 1.5;   // waits up to ~2s
+            s.bushT = 0.5 + rng() * 1.5;   // waits up to ~2s
             s.x = p.x;
             s.vx = 0;
             break;
@@ -1275,7 +1387,7 @@ function step(dt) {
       if (tentAlive && s.away && Math.abs(dxT) < 0.4) {
         s.inside = true;
         s.x = TENT.x;
-        s.hideT = 1.5 + Math.random() * 2.5;
+        s.hideT = 1.5 + rng() * 2.5;
         continue;
       }
       // attackers fire on the move
@@ -1283,15 +1395,16 @@ function step(dt) {
         s.shootT -= dt;
         const dxD = wrapDx(drone.x, s.x);
         const dyD = drone.y + 0.2 - (groundAt(s.x) + 0.5);
-        const dist = Math.hypot(dxD, dyD);
+        const dist = dHypot(dxD, dyD);
         if (s.shootT <= 0 && dist < WEAPON[s.cls].range && dist > 1.2) {
-          const ang = Math.atan2(dyD, dxD);
+          const inv = 1 / (dHypot(dxD, dyD) || 0.001);
+          const ux = dxD * inv, uy = dyD * inv;
           const spread = s.cls === 4 ? [-0.14, 0, 0.14] : [0];
           for (const off of spread) {
             bullets.push({
               x: s.x, y: groundAt(s.x) + 0.5,
-              vx: Math.cos(ang + off) * BULLET_SPEED,
-              vy: Math.sin(ang + off) * BULLET_SPEED,
+              vx: (ux * dCos(off) - uy * dSin(off)) * BULLET_SPEED,
+              vy: (ux * dSin(off) + uy * dCos(off)) * BULLET_SPEED,
               life: WEAPON[s.cls].life,
             });
           }
@@ -1317,7 +1430,7 @@ function step(dt) {
   bullets = bullets.filter(b => b.life > 0 && b.y > groundAt(b.x));
   if (flying) {
     for (const b of bullets) {
-      if (Math.hypot(wrapDx(b.x, drone.x), b.y - (drone.y + 0.2)) < DRONE_SPEC.hit) { detonate(); return; }
+      if (dHypot(wrapDx(b.x, drone.x), b.y - (drone.y + 0.2)) < DRONE_SPEC.hit) { detonate(); return; }
     }
   }
 
@@ -1360,7 +1473,7 @@ function step(dt) {
             Math.abs(wrapDx(s.x, bx)) < 14) { s.scareX = bx; s.scareT = 2.5; }
       }
       // the bomb can take out its own drone
-      if (flying && Math.hypot(wrapDx(drone.x, bx), drone.y - by) <= BLAST_R) { detonate(); return; }
+      if (flying && dHypot(wrapDx(drone.x, bx), drone.y - by) <= BLAST_R) { detonate(); return; }
       // a bomb that wipes the last target clears the level — even if the
       // drone has already gone down (the strike still landed)
       if (!levelCleared && soldiers.length && soldiers.every(s => !s.alive)) {
@@ -1459,15 +1572,15 @@ function killSoldier(s, atX, bx, by, ivx, ivy) {
   const n = tank ? 14 : 8;
   // blast impulse: debris flies away from the blast center, harder when close
   const ddx = wrapDx(atX, bx), ddy = 0.4 - by;
-  const dist = Math.hypot(ddx, ddy) || 0.001;
+  const dist = dHypot(ddx, ddy) || 0.001;
   const push = 9 * Math.max(0.2, 1 - dist / (BLAST_R + 1));
   const ux = ddx / dist, uy = ddy / dist;
   for (let i = 0; i < n; i++) {
     debris.push({
-      x: atX + (Math.random() - 0.5) * (tank ? 1.6 : 0.8),
-      y: 0.2 + Math.random() * 0.4,
-      vx: (Math.random() - 0.5) * (tank ? 12 : 8) + ux * push + ivx * 0.5,
-      vy: 2 + Math.random() * (tank ? 7 : 5) + uy * push + ivy * 0.5,
+      x: atX + (rng() - 0.5) * (tank ? 1.6 : 0.8),
+      y: 0.2 + rng() * 0.4,
+      vx: (rng() - 0.5) * (tank ? 12 : 8) + ux * push + ivx * 0.5,
+      vy: 2 + rng() * (tank ? 7 : 5) + uy * push + ivy * 0.5,
       col: tank ? YELLOW : RED,   // vehicles burn vintage yellow, casualties red
     });
   }
@@ -1495,15 +1608,15 @@ function applyBlast(bx, by, dmg = 1, ivx = 0, ivy = 0) {
     const sy = groundAt(s.x) + 0.3;   // chest height on the local terrain
     const reach = s.cls >= 5 ? 0.6 : 0.3;
     if (s.alive && s.emerged && !s.inside &&
-        Math.hypot(wrapDx(bx, s.x), by - sy) <= BLAST_R + reach) {
+        dHypot(wrapDx(bx, s.x), by - sy) <= BLAST_R + reach) {
       s.hp -= dmg;
       if (s.hp <= 0) {
         killSoldier(s, s.x, bx, by, ivx, ivy);
       } else {
         // armor absorbed the hit — sparks fly, the tank keeps fighting
         for (let i = 0; i < 4; i++) {
-          debris.push({ x: s.x + (Math.random() - 0.5), y: 0.3 + Math.random() * 0.4,
-                        vx: (Math.random() - 0.5) * 8, vy: 2 + Math.random() * 4 });
+          debris.push({ x: s.x + (rng() - 0.5), y: 0.3 + rng() * 0.4,
+                        vx: (rng() - 0.5) * 8, vy: 2 + rng() * 4 });
         }
       }
     }
@@ -1514,10 +1627,10 @@ function applyBlast(bx, by, dmg = 1, ivx = 0, ivy = 0) {
     padAlive = false;
     for (let i = 0; i < 8; i++) {
       debris.push({
-        x: PAD.x + (Math.random() - 0.5) * PAD.w,
-        y: PAD.h + Math.random() * 0.3,
-        vx: (Math.random() - 0.5) * 10,
-        vy: 2 + Math.random() * 6,
+        x: PAD.x + (rng() - 0.5) * PAD.w,
+        y: PAD.h + rng() * 0.3,
+        vx: (rng() - 0.5) * 10,
+        vy: 2 + rng() * 6,
       });
     }
   }
@@ -1532,9 +1645,9 @@ function applyBlast(bx, by, dmg = 1, ivx = 0, ivy = 0) {
       for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) {
         const wx = p.x + (x + i + 0.5) / PPM;
         const wy = pdy + (y + j + 0.5) / PPM;
-        if (Math.hypot(wrapDx(wx, bx), wy - by) <= BLAST_R) {
+        if (dHypot(wrapDx(wx, bx), wy - by) <= BLAST_R) {
           if (++destroyed % 4 === 0) {
-            debris.push({ x: wx, y: Math.max(0.1, wy), vx: (Math.random() - 0.5) * 10, vy: 2 + Math.random() * 6 });
+            debris.push({ x: wx, y: Math.max(0.1, wy), vx: (rng() - 0.5) * 10, vy: 2 + rng() * 6 });
           }
         } else {
           keep.push([x + i, y + j, 1, 1]);
@@ -1582,7 +1695,7 @@ function applyBlast(bx, by, dmg = 1, ivx = 0, ivy = 0) {
         x: p.x, cells: comp,
         minYpx: Math.min(...comp.map(c => c[1])),
         dy: pdy, vy: 0,
-        vx: (Math.sign(wrapDx(p.x, bx)) || (Math.random() < 0.5 ? -1 : 1)) * (0.3 + Math.random() * 0.7),
+        vx: (Math.sign(wrapDx(p.x, bx)) || (rng() < 0.5 ? -1 : 1)) * (0.3 + rng() * 0.7),
       });
     }
     if (!rootedCells.length) return false;
@@ -1602,10 +1715,10 @@ function applyBlast(bx, by, dmg = 1, ivx = 0, ivy = 0) {
   // debris downrange, dives splash it low and forward
   for (let i = 0; i < 26; i++) {
     debris.push({
-      x: bx + (Math.random() - 0.5) * BLAST_R * 2,
-      y: Math.max(0.1, by + (Math.random() - 0.5) * BLAST_R),
-      vx: (Math.random() - 0.5) * 14 + ivx * 0.5,
-      vy: 3 + Math.random() * 9 + ivy * 0.5,
+      x: bx + (rng() - 0.5) * BLAST_R * 2,
+      y: Math.max(0.1, by + (rng() - 0.5) * BLAST_R),
+      vx: (rng() - 0.5) * 14 + ivx * 0.5,
+      vy: 3 + rng() * 9 + ivy * 0.5,
     });
   }
 }
@@ -1615,7 +1728,7 @@ function detonate() {
   state = S.DESTROYED;
   droneSpent = true;
   lives--;
-  const hitSpeed = Math.hypot(drone.vx, drone.vy);
+  const hitSpeed = dHypot(drone.vx, drone.vy);
   // bombs still on the rack cook off with the warhead: damage = 1 + payload
   const dmg = 1 + bombsLeft;
   bombsLeft = 0;
@@ -1778,7 +1891,7 @@ function draw(dt) {
   ctx.save();
   if (shake > 0) {
     shake = Math.max(0, shake - dt);
-    ctx.translate(Math.round((Math.random() - 0.5) * 4 * shake * 2), Math.round((Math.random() - 0.5) * 4 * shake * 2));
+    ctx.translate(Math.round((Math.random() - 0.5) * 4 * shake * 2), Math.round((Math.random() - 0.5) * 4 * shake * 2));   // visual only — NEVER the seeded stream
   }
 
   // stars
@@ -2046,8 +2159,7 @@ function renderTapes(altD, vs) {
   boxREl.textContent = '◀ ' + String(Math.round(altD)).padStart(4);
 }
 
-scatterPlants();   // title screen scenery
-let plantsFresh = true;   // level 1 inherits this exact forest (see start())
+scatterPlants();   // title screen scenery (reseeded when the run token arrives)
 
 /* ---------- touch controls: RC-transmitter style ---------- */
 document.body.classList.add('home');   // starts on the title screen
@@ -2166,7 +2278,8 @@ addEventListener('pointerdown', e => {
 /* ---------- LEADERBOARD (see LEADERBOARD-SPEC.md) ---------- */
 const LB = {
   entries: null,   // fetched board rows [{rank,name,promo,url,score,bid}]
-  token: null,     // signed run token for this campaign
+  run: null,       // { token, seed } — this campaign's signed run
+  nextRun: null,   // prefetched for the next campaign
   pending: null,   // { score, level } — finished chapter, claimable
 };
 const LB_FLOOR = 1;
@@ -2236,10 +2349,20 @@ async function lbFetch() {
   lbAttractInit();
   lbMobileHome();
 }
-function lbStartToken() {
-  LB.token = null;
+function lbPrefetchRun() {
+  if (VERIFY) return;
   fetch('/api/run-start', { method: 'POST' })
-    .then(r => r.json()).then(d => { LB.token = d.token; }).catch(() => {});
+    .then(r => r.json())
+    .then(d => {
+      if (!d.token) return;
+      LB.nextRun = { token: d.token, seed: d.seed | 0 };
+      if (state === S.TITLE) lbHomeForest();
+    }).catch(() => {});
+}
+// preview the exact forest the next campaign's level 1 will scatter
+function lbHomeForest() {
+  if (LB.nextRun) srand(mixSeed(LB.nextRun.seed, 1, 1));
+  scatterPlants();
 }
 
 /* ---------- home-screen attract window: 3-card ping-pong crop ---------- */
@@ -2408,7 +2531,10 @@ async function lbPay() {
   const err = document.getElementById('lbErr');
   const bid = parseFloat(document.getElementById('lbBid').value);
   if (!(bid >= lbTarget.min)) { err.textContent = 'YOUR BID MUST BE AT LEAST ' + lbMoney(lbTarget.min); return; }
-  if (!LB.token) { err.textContent = 'NO RUN TOKEN — FINISH A RUN IN THIS SESSION FIRST'; return; }
+  if (!LB.run) { err.textContent = 'NO RUN TOKEN — FINISH A RUN IN THIS SESSION FIRST'; return; }
+  recEndAttempt();
+  const replay = { v: 1, vw: VW, attempts: REC.attempts };
+  if (JSON.stringify(replay).length > 400000) { err.textContent = 'RUN TOO LONG TO VERIFY — PLAY A FRESH ONE'; return; }
   const name = document.getElementById('lbName').value;
   const promo = document.getElementById('lbPromo').value;
   const url = document.getElementById('lbUrl').value.replace(/^https?:\/\//, '');
@@ -2422,8 +2548,8 @@ async function lbPay() {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        token: LB.token, level: LB.pending.level, score: LB.pending.score,
-        name, promo, url, bidCents: Math.round(bid * 100),
+        token: LB.run.token, level: LB.pending.level, score: LB.pending.score,
+        name, promo, url, bidCents: Math.round(bid * 100), replay,
       }),
     });
     const d = await r.json();
@@ -2488,11 +2614,14 @@ function lbBeatBlock() {
 }
 
 /* ---------- boot ---------- */
+if (!VERIFY) {
+lbPrefetchRun();   // the first campaign's signed run (and its forest seed)
 lbFetch().then(() => {
   const q = new URLSearchParams(location.search);
   if (q.get('claim') === 'success' && q.get('session')) lbSecured(q.get('session'));
   if (q.get('claim')) history.replaceState(null, '', location.pathname);
 });
+}
 
 /* ---------- offline / install (PWA) ---------- */
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
@@ -2511,7 +2640,40 @@ function loop(now) {
   draw(dt);
   requestAnimationFrame(loop);
 }
-requestAnimationFrame(loop);
+if (!VERIFY) requestAnimationFrame(loop);
+
+/* ---------- replay verification entry point (server-side jsdom) ---------- */
+if (VERIFY) window.__verifyRun = function (replay) {
+  try {
+    level = 1; score = 0; lives = 5; attempts = 0;
+    levelCleared = false; verdictPending = false; state = S.TITLE;
+    LB.run = { token: 'verify', seed: replay.seed | 0 };
+    LB.nextRun = null;
+    if (!Array.isArray(replay.attempts) || !replay.attempts.length || replay.attempts.length > 500)
+      return { ok: false, error: 'bad replay shape' };
+    for (const at of replay.attempts) {
+      PLAYBACK = { cur: at, di: 0, mask: 0, drops: new Set(at.b || []) };
+      pressStart();
+      // progression (clears, resets) happens inside pressStart — the recorded
+      // labels must match what the sim itself arrived at
+      if (at.l !== level || at.a !== attempts)
+        return { ok: false, error: 'attempt sequence mismatch (sim is at L' + level + ' A' + attempts + ')' };
+      const end = Math.min(at.e | 0, 120 * 60 * 30);
+      while (recStep < end) step(STEP);
+      PLAYBACK = null;
+      if (typeof at.h === 'number' && simFingerprint() !== at.h)
+        return { ok: false, error: 'state fingerprint mismatch at L' + at.l + ' A' + at.a };
+    }
+    return {
+      ok: true,
+      over: lives <= 0 && !levelCleared,
+      score,
+      level: levelCleared ? level : level - 1,
+    };
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e).slice(0, 200) };
+  }
+};
 </script>
 </body>
 </html>

@@ -1,7 +1,8 @@
 import {
-  sql, stripe, json, boardEntries, verifyRunToken, minClaimCents,
+  sql, stripe, json, boardEntries, verifyRunToken, minClaimCents, runSeed,
   maxCampaignScore, MIN_MS_PER_LEVEL, SITE, NAME_MAX, PROMO_MAX, URL_MAX, FLOOR_CENTS,
 } from './_lib.js';
+import { verifyReplay } from './_verify.js';
 
 const clean = (s, max) =>
   String(s || '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, max);
@@ -27,6 +28,23 @@ export async function POST(request) {
     return json({ error: 'score out of range for level ' + level }, 400);
   if (Date.now() - tok.ts < level * MIN_MS_PER_LEVEL)
     return json({ error: 'too fast to be a real run' }, 400);
+
+  // replay verification: re-simulate the recorded campaign with the run's
+  // seed — the claimed score must be exactly what the sim recomputes
+  if (!body.replay || typeof body.replay !== 'object')
+    return json({ error: 'replay missing' }, 400);
+  if (JSON.stringify(body.replay).length > 500000)
+    return json({ error: 'replay too large' }, 400);
+  let sim;
+  try {
+    sim = await verifyReplay(body.replay, runSeed(tok.id));
+  } catch (e) {
+    return json({ error: 'verifier failed: ' + String(e.message || e).slice(0, 120) }, 502);
+  }
+  if (!sim.ok) return json({ error: 'replay rejected: ' + (sim.error || 'invalid') }, 400);
+  if (!sim.over) return json({ error: 'replay does not end in game over' }, 400);
+  if (sim.score !== score || sim.level !== level)
+    return json({ error: 'replay disproves the claimed score (sim: ' + sim.score + ' pts, level ' + sim.level + ')' }, 400);
 
   const name = clean(body.name, NAME_MAX) || 'ACE';
   const promo = clean(body.promo, PROMO_MAX);
