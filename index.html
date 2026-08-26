@@ -202,23 +202,41 @@
     border-radius: 50%;
     pointer-events: none;
   }
-  #bombBtn {
+  .ctlbtn {
     position: absolute;
-    right: 13%;
-    top: 30%;
-    width: 58px; height: 58px;
+    right: 4%;
+    width: 74px; height: 74px;
     border-radius: 50%;
     border: 1px solid #e8e4d8;
     background: rgba(48, 48, 48, 0.6);
     color: #e8e4d8;
     font-family: inherit;
-    font-size: 11px;
-    letter-spacing: 1px;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     pointer-events: auto;
     touch-action: none;
+    user-select: none;
+    padding: 0;
   }
-  #bombBtn:active { background: #e8e4d8; color: #303030; }
+  #thrustBtn { bottom: 36%; }
+  #brakeBtn { bottom: 7%; }
+  .ctlbtn.on { background: #e8e4d8; color: #303030; }
   body.touch #menu { pointer-events: auto; }
+  /* compact HUD + screens on touch devices */
+  body.touch .tape { font-size: 10px; line-height: 10px; }
+  body.touch .tapebox { font-size: 11px; padding: 1px 3px; }
+  body.touch #bank { font-size: 10px; line-height: 9px; }
+  body.touch #wind, body.touch #gs, body.touch #menu,
+  body.touch #lvl, body.touch #obj, body.touch #stat { font-size: 10px; }
+  body.touch #msg { gap: 8px; }
+  body.touch #msg .title { font-size: 26px; letter-spacing: 6px; }
+  body.touch #msg .sub { font-size: 10px; }
+  body.touch #msg .titleorn { font-size: 10px; }
+  /* keep the right-hand buttons clear of the altitude tape */
+  body.touch #tapeR { right: 118px; }
+  body.touch #boxR { right: 118px; }
   body { touch-action: none; }
   #rotate {
     display: none;
@@ -286,10 +304,9 @@
     <div id="panel"></div>
     <div id="touch">
       <div class="zone" id="zoneL"></div>
-      <div class="zone" id="zoneR"></div>
       <div class="stickbase hidden" id="baseL"><div class="stickknob" id="knobL"></div></div>
-      <div class="stickbase hidden" id="baseR"><div class="stickknob" id="knobR"></div></div>
-      <button id="bombBtn">BOMB</button>
+      <button class="ctlbtn" id="thrustBtn">&#9650;</button>
+      <button class="ctlbtn" id="brakeBtn">&#9660;</button>
     </div>
     <div id="msg">
       <div class="titleorn">──────────────&#9660;──────────────</div>
@@ -327,7 +344,7 @@ const statEl = document.getElementById('stat');
 const lvlEl = document.getElementById('lvl');
 const objEl = document.getElementById('obj');
 const msgEl = document.getElementById('msg');
-const titleHTML = msgEl.innerHTML;   // for returning to the menu via ESC
+let titleHTML = msgEl.innerHTML;   // for returning to the menu via ESC
 const bannerEl = document.getElementById('banner');
 
 function fit() {
@@ -1583,7 +1600,7 @@ function draw(dt) {
 
   // HUD: aviation-style tapes and indicators
   if (state !== S.TITLE) {
-    const TAPE_LH = 14, HALF = 7;
+    const TAPE_LH = document.body.classList.contains('touch') ? 10 : 14, HALF = 7;
 
     // left: vertical speed tape (2 m/s ticks, labels every 10),
     // with a range bar marking the safe touchdown band (0 to -CRASH_SPEED)
@@ -1673,8 +1690,18 @@ renderPanel();
 
 scatterPlants();   // title screen scenery
 
-/* ---------- touch controls: twin-stick RC transmitter ---------- */
-if (matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
+/* ---------- touch controls: RC-transmitter style ---------- */
+if (matchMedia('(pointer: coarse)').matches) {
+  document.body.classList.add('touch');
+  // rewrite the title-screen instructions for touch
+  const subs = msgEl.querySelectorAll('.sub');
+  subs[0].innerHTML =
+    'LEFT STICK&nbsp;&nbsp;BANK<br>' +
+    'RIGHT BUTTONS&nbsp;&nbsp;THRUST / BRAKE<br>' +
+    'SLIDE A BUTTON DOWN&nbsp;&nbsp;BOMB';
+  subs[1].textContent = 'TAP TO START';
+  titleHTML = msgEl.innerHTML;
+}
 
 function bindStick(zoneId, baseId, knobId, apply, release) {
   const zone = document.getElementById(zoneId);
@@ -1715,20 +1742,43 @@ function bindStick(zoneId, baseId, knobId, apply, release) {
 }
 
 const STICK_DEAD = 0.25;
-// left stick = throttle: up thrust, down reverse-thrust brake
+// left stick = bank left/right
 bindStick('zoneL', 'baseL', 'knobL',
-  (dx, dy) => { keys['w'] = dy < -STICK_DEAD; keys['s'] = dy > STICK_DEAD; },
-  () => { keys['w'] = false; keys['s'] = false; });
-// right stick = tilt left/right
-bindStick('zoneR', 'baseR', 'knobR',
   (dx, dy) => { keys['a'] = dx < -STICK_DEAD; keys['d'] = dx > STICK_DEAD; },
   () => { keys['a'] = false; keys['d'] = false; });
 
-document.getElementById('bombBtn').addEventListener('pointerdown', e => {
-  e.preventDefault();
-  e.stopPropagation();
-  dropBomb();
-});
+// right hand: hold buttons for thrust / brake; slide a held finger down
+// past ~40px to release a bomb (re-arms when you slide back up)
+function bindHoldBtn(id, key) {
+  const el = document.getElementById(id);
+  let pid = null, sy = 0, bombed = false;
+  el.addEventListener('pointerdown', e => {
+    pid = e.pointerId;
+    el.setPointerCapture(pid);
+    sy = e.clientY;
+    bombed = false;
+    keys[key] = true;
+    el.classList.add('on');
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  el.addEventListener('pointermove', e => {
+    if (e.pointerId !== pid) return;
+    const dy = e.clientY - sy;
+    if (!bombed && dy > 40) { bombed = true; dropBomb(); }
+    if (bombed && dy < 15) bombed = false;   // re-arm for another slide
+  });
+  const end = e => {
+    if (e.pointerId !== pid) return;
+    pid = null;
+    keys[key] = false;
+    el.classList.remove('on');
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+}
+bindHoldBtn('thrustBtn', 'w');
+bindHoldBtn('brakeBtn', 's');
 document.getElementById('menu').addEventListener('click', () => {
   if (state !== S.TITLE) gotoMenu();
 });
