@@ -2,7 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#303030">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
 <title>DRONE RAID</title>
 <style>
   @font-face {
@@ -173,6 +180,62 @@
     user-select: none;
   }
   .hidden { display: none !important; }
+  /* touch controls: RC-transmitter style twin sticks (touch devices only) */
+  #touch { position: absolute; inset: 0; display: none; pointer-events: none; }
+  body.touch #touch { display: block; }
+  .zone { position: absolute; bottom: 0; height: 62%; width: 42%; pointer-events: auto; touch-action: none; }
+  #zoneL { left: 0; }
+  #zoneR { right: 0; }
+  .stickbase {
+    position: absolute;
+    width: 92px; height: 92px;
+    margin: -46px;
+    border: 1px solid rgba(232, 228, 216, 0.4);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .stickknob {
+    position: absolute;
+    width: 34px; height: 34px;
+    margin: -17px;
+    background: rgba(232, 228, 216, 0.55);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  #bombBtn {
+    position: absolute;
+    right: 13%;
+    top: 30%;
+    width: 58px; height: 58px;
+    border-radius: 50%;
+    border: 1px solid #e8e4d8;
+    background: rgba(48, 48, 48, 0.6);
+    color: #e8e4d8;
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 1px;
+    pointer-events: auto;
+    touch-action: none;
+  }
+  #bombBtn:active { background: #e8e4d8; color: #303030; }
+  body.touch #menu { pointer-events: auto; }
+  body { touch-action: none; }
+  #rotate {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: #303030;
+    color: #e8e4d8;
+    z-index: 99;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    letter-spacing: 3px;
+    text-align: center;
+  }
+  @media (orientation: portrait) {
+    body.touch #rotate { display: flex; }
+  }
   /* temporary level testbed */
   #panel {
     position: absolute;
@@ -221,6 +284,13 @@
     </div>
     <div id="banner" class="hidden"></div>
     <div id="panel"></div>
+    <div id="touch">
+      <div class="zone" id="zoneL"></div>
+      <div class="zone" id="zoneR"></div>
+      <div class="stickbase hidden" id="baseL"><div class="stickknob" id="knobL"></div></div>
+      <div class="stickbase hidden" id="baseR"><div class="stickknob" id="knobR"></div></div>
+      <button id="bombBtn">BOMB</button>
+    </div>
     <div id="msg">
       <div class="titleorn">──────────────&#9660;──────────────</div>
       <div class="title">DRONE RAID</div>
@@ -232,6 +302,7 @@
       <div class="sub blink">PRESS ENTER TO START</div>
     </div>
   </div>
+  <div id="rotate">ROTATE YOUR DEVICE<br>DRONE RAID FLIES IN LANDSCAPE</div>
 </div>
 
 <script>
@@ -516,23 +587,31 @@ addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   keys[k] = true;
   if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) e.preventDefault();
-  if (e.key === 'Enter' && (state !== S.FLYING || won)) {
-    if (levelCleared) { level++; levelCleared = false; }
-    start();
-  }
-  if (e.key === 'Escape' && state !== S.TITLE) {
-    state = S.TITLE;
-    won = false;
-    msgEl.innerHTML = titleHTML;
-    msgEl.classList.remove('hidden');
-    hudEl.classList.add('hidden');
-    bannerEl.classList.add('hidden');
-  }
-  if (k === ' ' && state === S.FLYING && !drone.grounded && bombsLeft > 0) {
+  if (e.key === 'Enter' && (state !== S.FLYING || won)) pressStart();
+  if (e.key === 'Escape' && state !== S.TITLE) gotoMenu();
+  if (k === ' ') dropBomb();
+});
+
+function pressStart() {
+  if (levelCleared) { level++; levelCleared = false; }
+  start();
+}
+
+function gotoMenu() {
+  state = S.TITLE;
+  won = false;
+  msgEl.innerHTML = titleHTML;
+  msgEl.classList.remove('hidden');
+  hudEl.classList.add('hidden');
+  bannerEl.classList.add('hidden');
+}
+
+function dropBomb() {
+  if (state === S.FLYING && !drone.grounded && bombsLeft > 0) {
     bombsLeft--;
     airBombs.push({ x: drone.x, y: drone.y - 0.2, vx: drone.vx, vy: drone.vy - 1.5 });
   }
-});
+}
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
 function start() {
@@ -1593,6 +1672,77 @@ panelEl.addEventListener('click', e => {
 renderPanel();
 
 scatterPlants();   // title screen scenery
+
+/* ---------- touch controls: twin-stick RC transmitter ---------- */
+if (matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
+
+function bindStick(zoneId, baseId, knobId, apply, release) {
+  const zone = document.getElementById(zoneId);
+  const base = document.getElementById(baseId);
+  const knob = document.getElementById(knobId);
+  const MAX = 40;
+  let pid = null, cx = 0, cy = 0;
+  zone.addEventListener('pointerdown', e => {
+    if (pid !== null) return;
+    pid = e.pointerId;
+    zone.setPointerCapture(pid);
+    const r = stage.getBoundingClientRect();
+    cx = e.clientX; cy = e.clientY;
+    base.style.left = (cx - r.left) + 'px';
+    base.style.top = (cy - r.top) + 'px';
+    base.classList.remove('hidden');
+    knob.style.left = '50%';
+    knob.style.top = '50%';
+    e.preventDefault();
+  });
+  zone.addEventListener('pointermove', e => {
+    if (e.pointerId !== pid) return;
+    let dx = e.clientX - cx, dy = e.clientY - cy;
+    const m = Math.hypot(dx, dy);
+    if (m > MAX) { dx *= MAX / m; dy *= MAX / m; }
+    knob.style.left = 'calc(50% + ' + dx.toFixed(0) + 'px)';
+    knob.style.top = 'calc(50% + ' + dy.toFixed(0) + 'px)';
+    apply(dx / MAX, dy / MAX);
+  });
+  const end = e => {
+    if (e.pointerId !== pid) return;
+    pid = null;
+    base.classList.add('hidden');
+    release();
+  };
+  zone.addEventListener('pointerup', end);
+  zone.addEventListener('pointercancel', end);
+}
+
+const STICK_DEAD = 0.25;
+// left stick = throttle: up thrust, down reverse-thrust brake
+bindStick('zoneL', 'baseL', 'knobL',
+  (dx, dy) => { keys['w'] = dy < -STICK_DEAD; keys['s'] = dy > STICK_DEAD; },
+  () => { keys['w'] = false; keys['s'] = false; });
+// right stick = tilt left/right
+bindStick('zoneR', 'baseR', 'knobR',
+  (dx, dy) => { keys['a'] = dx < -STICK_DEAD; keys['d'] = dx > STICK_DEAD; },
+  () => { keys['a'] = false; keys['d'] = false; });
+
+document.getElementById('bombBtn').addEventListener('pointerdown', e => {
+  e.preventDefault();
+  e.stopPropagation();
+  dropBomb();
+});
+document.getElementById('menu').addEventListener('click', () => {
+  if (state !== S.TITLE) gotoMenu();
+});
+// tap anywhere to start / advance (touch devices)
+addEventListener('pointerdown', e => {
+  if (!document.body.classList.contains('touch')) return;
+  if (e.target.closest('button')) return;
+  if (state !== S.FLYING || won) pressStart();
+});
+
+/* ---------- offline / install (PWA) ---------- */
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
 
 /* ---------- main loop: fixed timestep ---------- */
 const STEP = 1 / 120;
