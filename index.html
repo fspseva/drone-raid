@@ -89,7 +89,7 @@
   #wind {
     position: absolute;
     top: 3.5%;
-    left: calc(9% + env(safe-area-inset-left, 0px));
+    left: calc(13% + env(safe-area-inset-left, 0px));
     font-size: 13px;
     letter-spacing: 1px;
   }
@@ -124,8 +124,8 @@
   }
   #menu {
     position: absolute;
-    bottom: 1.2%;
-    right: calc(2% + env(safe-area-inset-right, 0px));
+    top: 3.5%;
+    left: calc(2% + env(safe-area-inset-left, 0px));
     font-size: 13px;
     letter-spacing: 1px;
   }
@@ -185,18 +185,20 @@
   body.touch #touch { display: block; }
   .zone { position: absolute; bottom: 0; height: 100%; width: 42%; pointer-events: auto; touch-action: none; }
   #zoneL { left: 0; }
-  #zoneR { right: 0; }
-  #splitDash {
-    display: none;
+  /* right-hand tap boxes, corners marked with diagonal arrows */
+  #zBomb   { left: auto; right: 16%; width: 16%; top: 0; height: 100%; }
+  #zThrust { left: auto; right: 0;  width: 16%; top: 0; height: 50%; }
+  #zBrake  { left: auto; right: 0;  width: 16%; top: 50%; height: 50%; }
+  .zone .c {
     position: absolute;
-    top: 50%;
-    right: calc(80px + env(safe-area-inset-right, 0px));
-    width: 12px;
-    height: 1px;
-    background: rgba(232, 228, 216, 0.5);
+    font-size: 12px;
+    color: rgba(232, 228, 216, 0.35);
     pointer-events: none;
   }
-  body.touch #splitDash { display: block; }
+  .c.tl { top: 2px; left: 4px; }
+  .c.tr { top: 2px; right: 4px; }
+  .c.bl { bottom: 2px; left: 4px; }
+  .c.br { bottom: 2px; right: 4px; }
   .stickbase {
     position: absolute;
     width: 92px; height: 92px;
@@ -296,8 +298,9 @@
     <div id="panel"></div>
     <div id="touch">
       <div class="zone" id="zoneL"></div>
-      <div class="zone" id="zoneR"></div>
-      <div id="splitDash"></div>
+      <div class="zone" id="zBomb"><span class="c tl">&#8598;</span><span class="c tr">&#8599;</span><span class="c bl">&#8601;</span><span class="c br">&#8600;</span></div>
+      <div class="zone" id="zThrust"><span class="c tl">&#8598;</span><span class="c tr">&#8599;</span><span class="c bl">&#8601;</span><span class="c br">&#8600;</span></div>
+      <div class="zone" id="zBrake"><span class="c tl">&#8598;</span><span class="c tr">&#8599;</span><span class="c bl">&#8601;</span><span class="c br">&#8600;</span></div>
       <div class="stickbase hidden" id="baseL"><div class="stickknob" id="knobL"></div></div>
     </div>
     <div id="msg">
@@ -1696,9 +1699,9 @@ if (matchMedia('(pointer: coarse)').matches) {
   const subs = msgEl.querySelectorAll('.sub');
   subs[0].innerHTML =
     'LEFT STICK&nbsp;&nbsp;BANK<br>' +
-    'RIGHT SIDE&nbsp;&nbsp;TOUCH HIGH = THRUST, LOW = BRAKE<br>' +
-    'SLIDE DOWN&nbsp;&nbsp;BOMB';
+    'RIGHT BOXES&nbsp;&nbsp;BOMB &#183; THRUST / BRAKE';
   subs[1].textContent = 'TAP TO START';
+  document.getElementById('menu').textContent = 'MENU';
   titleHTML = msgEl.innerHTML;
 }
 
@@ -1746,37 +1749,31 @@ bindStick('zoneL', 'baseL', 'knobL',
   (dx, dy) => { keys['a'] = dx < -STICK_DEAD; keys['d'] = dx > STICK_DEAD; },
   () => { keys['a'] = false; keys['d'] = false; });
 
-// right hand: touch the upper half of the right zone for thrust, the lower
-// half for brake (locked at touch-start). Slide a held finger down ~40px to
-// release a bomb; it re-arms when you slide back up.
-{
-  const zoneR = document.getElementById('zoneR');
-  let pid = null, sy = 0, key = null, bombed = false;
-  zoneR.addEventListener('pointerdown', e => {
+// right hand: three tap boxes — BOMB column, THRUST (upper), BRAKE (lower)
+function bindHoldZone(id, key) {
+  const el = document.getElementById(id);
+  let pid = null;
+  el.addEventListener('pointerdown', e => {
     if (pid !== null) return;
     pid = e.pointerId;
-    zoneR.setPointerCapture(pid);
-    const r = stage.getBoundingClientRect();
-    key = e.clientY < r.top + r.height / 2 ? 'w' : 's';   // exact screen half
+    el.setPointerCapture(pid);
     keys[key] = true;
-    sy = e.clientY;
-    bombed = false;
     e.preventDefault();
-  });
-  zoneR.addEventListener('pointermove', e => {
-    if (e.pointerId !== pid) return;
-    const dy = e.clientY - sy;
-    if (!bombed && dy > 40) { bombed = true; dropBomb(); }
-    if (bombed && dy < 15) bombed = false;
   });
   const end = e => {
     if (e.pointerId !== pid) return;
     pid = null;
-    if (key) keys[key] = false;
+    keys[key] = false;
   };
-  zoneR.addEventListener('pointerup', end);
-  zoneR.addEventListener('pointercancel', end);
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
 }
+bindHoldZone('zThrust', 'w');
+bindHoldZone('zBrake', 's');
+document.getElementById('zBomb').addEventListener('pointerdown', e => {
+  e.preventDefault();
+  dropBomb();
+});
 document.getElementById('menu').addEventListener('click', () => {
   if (state !== S.TITLE) gotoMenu();
 });
