@@ -351,7 +351,7 @@
       <div class="sub" id="best"></div>
     </div>
   </div>
-  <div id="rotate">ROTATE YOUR DEVICE<br>DRONE RAID FLIES IN LANDSCAPE</div>
+  <div id="rotate"><div>ROTATE YOUR DEVICE<br>DRONE RAID FLIES IN LANDSCAPE</div></div>
 </div>
 
 <script>
@@ -1823,14 +1823,16 @@ if (matchMedia('(pointer: coarse)').matches) {
   const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
   if (!standalone) {
     const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
-    document.getElementById('rotate').innerHTML =
+    // single inner block: #rotate is a flex row, and bare text/spans would
+    // become separate flex items rendered as side-by-side columns
+    document.getElementById('rotate').innerHTML = '<div>' +
       'ADD TO HOME SCREEN<br>' +
       '<span class="dim">' +
       (ios ? 'TAP SHARE, THEN &#8220;ADD TO HOME SCREEN&#8221;'
            : 'BROWSER MENU, THEN &#8220;ADD TO HOME SCREEN&#8221;') +
       '</span><br><br>' +
       'THEN ROTATE TO LANDSCAPE<br>' +
-      '<span class="dim">DRONE RAID FLIES FULLSCREEN</span>';
+      '<span class="dim">DRONE RAID FLIES FULLSCREEN</span></div>';
   }
   // rewrite the title-screen instructions for touch
   const subs = msgEl.querySelectorAll('.sub');
