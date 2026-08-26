@@ -372,6 +372,39 @@
   #lb .rule { font-size: 10px; color: rgba(232,228,216,0.55); line-height: 1.8; margin-top: 10px; text-align: left; }
   #lb .mid { text-align: center; font-size: 12px; line-height: 2; color: rgba(232,228,216,0.8); }
   #lb .bigline { text-align: center; font-size: 20px; letter-spacing: 4px; margin: 22px 0 8px; }
+  /* mobile home: scrollable descent from title altitude down to the ground */
+  #mHome { display: none; }
+  body.touch.home #mHome {
+    display: block;
+    position: absolute; inset: 0; z-index: 30;
+    overflow-y: auto;
+    touch-action: pan-y;
+    pointer-events: auto;
+    scrollbar-width: none;
+  }
+  #mHome::-webkit-scrollbar { display: none; }
+  body.touch.home #msg { display: none; }          /* mHome replaces the title card */
+  body.touch.home #lbAttract { display: none; }
+  /* on the home descent only the side tapes of the HUD are alive */
+  body.touch.home #hud > :not(.tape):not(.tapebox) { display: none !important; }
+  .mhAlt {
+    min-height: 88%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: #303030;
+    position: relative;
+    padding: 0 60px;
+    text-align: center;
+  }
+  .mhTitle { font-size: 26px; letter-spacing: 6px; margin: 8px 0; }
+  .mhArrow { position: absolute; bottom: 12px; left: 0; right: 0; text-align: center; font-size: 13px; }
+  .mhBoard { background: #303030; padding: 4px 60px 20px; }
+  #mHomeMore { display: block; width: 100%; margin-top: 12px; padding: 10px; }
+  .mhGround {
+    min-height: 100%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px;
+    text-align: center;
+  }
   /* touch: compact leaderboard */
   body.touch #lbAttractWrap { height: 120px; }
   body.touch .lbTable td { padding: 5px 6px; }
@@ -451,6 +484,25 @@
       <div class="sub" id="best"></div>
     </div>
     <div id="lb" class="hidden"></div>
+    <!-- mobile home: a vertical descent — title at altitude, leaderboard on the
+         way down, the game waiting on the ground (see LEADERBOARD-SPEC.md §9) -->
+    <div id="mHome">
+      <section class="mhAlt">
+        <div class="titleorn">──────────&#9660;──────────</div>
+        <div class="mhTitle">DRONE RAID</div>
+        <div class="titleorn">──────────&#9650;──────────</div>
+        <div class="lbTagline" style="margin-top:16px">OUTRANK THE COMPETITION &#183; CLAIM YOUR POSITION &#183; PROMOTE WHATEVER YOU WANT</div>
+        <div class="mhArrow blink">&#9660;</div>
+      </section>
+      <section class="mhBoard">
+        <table class="lbTable" id="mHomeTable"></table>
+        <button class="lbBtn" id="mHomeMore">VIEW THE COMPLETE LEADERBOARD &#9654;</button>
+      </section>
+      <section class="mhGround" id="mHomeStart">
+        <div class="sub" id="mHomeBest"></div>
+        <div class="sub blink">TAP TO START</div>
+      </section>
+    </div>
   </div>
   <div id="rotate"><div>ROTATE YOUR DEVICE<br>DRONE RAID FLIES IN LANDSCAPE</div></div>
 </div>
@@ -842,6 +894,7 @@ function gotoMenu() {
   hudEl.classList.add('hidden');
   bannerEl.classList.add('hidden');
   lbAttractInit();   // titleHTML restore recreated the attract window
+  if (IS_TOUCH()) { mHomeEl.scrollTop = 0; lbMobileHome(); }   // back to altitude
 }
 
 function dropBomb() {
@@ -1868,39 +1921,7 @@ function draw(dt) {
 
   // HUD: aviation-style tapes and indicators
   if (state !== S.TITLE) {
-    const TAPE_LH = document.body.classList.contains('touch') ? 10 : 14, HALF = 7;
-
-    // left: vertical speed tape (2 m/s ticks, labels every 10),
-    // with a range bar marking the safe touchdown band (0 to -CRASH_SPEED)
-    const vs = drone.vy;
-    const baseV = Math.floor(vs / 2);
-    let linesL = [];
-    for (let i = baseV + HALF; i >= baseV - HALF; i--) {
-      const v = i * 2;
-      const band = v <= 0 && v >= -CRASH_SPEED ? '▌' : ' ';
-      linesL.push((v % 10 === 0 ? String(v).padStart(3) + ' ─┤' : '     ┤') + band);
-    }
-    tapeLEl.textContent = linesL.join('\n');
-    const fracV = vs / 2 - baseV;
-    tapeLEl.style.transform = 'translateY(calc(-50% + ' + (fracV * TAPE_LH - TAPE_LH / 2).toFixed(1) + 'px))';
-    const inBand = vs <= 0.2 && vs >= -CRASH_SPEED;
-    boxLEl.className = 'tapebox' + (inBand ? ' inband' : '') + (vs < -CRASH_SPEED ? ' blink' : '');
-    boxLEl.textContent = (inBand ? 'LAND' : (vs >= 0 ? '+' : '') + vs.toFixed(0).padStart(3)) + ' ▶';
-
-    // right: altitude tape (10m ticks, labels every 20m)
-    const altD = drone.y * ALT_SCALE;
-    const baseA = Math.floor(altD / 10);
-    let linesR = [];
-    for (let i = baseA + HALF; i >= baseA - HALF; i--) {
-      const v = i * 10;
-      if (v < 0) { linesR.push('├'); continue; }   // spine continues below ground
-      linesR.push(v % 20 === 0 ? '├─ ' + String(v).padEnd(4) : '├');
-    }
-    tapeREl.textContent = linesR.join('\n');
-    const fracA = altD / 10 - baseA;
-    tapeREl.style.transform = 'translateY(calc(-50% + ' + (fracA * TAPE_LH - TAPE_LH / 2).toFixed(1) + 'px))';
-    boxREl.className = 'tapebox';
-    boxREl.textContent = '◀ ' + String(Math.round(altD)).padStart(4);
+    renderTapes(drone.y * ALT_SCALE, drone.vy);
 
     // top center: bank angle indicator, one tick per 10 degrees
     const bankDeg = drone.tilt * 180 / Math.PI;
@@ -1948,6 +1969,42 @@ function draw(dt) {
       }
     }
   }
+}
+
+// side tapes (VS left, ALT right) — used by the flight HUD and, on mobile,
+// by the scrollable home screen where scroll position IS the altitude
+function renderTapes(altD, vs) {
+  const TAPE_LH = document.body.classList.contains('touch') ? 10 : 14, HALF = 7;
+
+  // left: vertical speed tape (2 m/s ticks, labels every 10),
+  // with a range bar marking the safe touchdown band (0 to -CRASH_SPEED)
+  const baseV = Math.floor(vs / 2);
+  let linesL = [];
+  for (let i = baseV + HALF; i >= baseV - HALF; i--) {
+    const v = i * 2;
+    const band = v <= 0 && v >= -CRASH_SPEED ? '▌' : ' ';
+    linesL.push((v % 10 === 0 ? String(v).padStart(3) + ' ─┤' : '     ┤') + band);
+  }
+  tapeLEl.textContent = linesL.join('\n');
+  const fracV = vs / 2 - baseV;
+  tapeLEl.style.transform = 'translateY(calc(-50% + ' + (fracV * TAPE_LH - TAPE_LH / 2).toFixed(1) + 'px))';
+  const inBand = vs <= 0.2 && vs >= -CRASH_SPEED;
+  boxLEl.className = 'tapebox' + (inBand ? ' inband' : '') + (vs < -CRASH_SPEED ? ' blink' : '');
+  boxLEl.textContent = (inBand ? 'LAND' : (vs >= 0 ? '+' : '') + vs.toFixed(0).padStart(3)) + ' ▶';
+
+  // right: altitude tape (10m ticks, labels every 20m)
+  const baseA = Math.floor(altD / 10);
+  let linesR = [];
+  for (let i = baseA + HALF; i >= baseA - HALF; i--) {
+    const v = i * 10;
+    if (v < 0) { linesR.push('├'); continue; }   // spine continues below ground
+    linesR.push(v % 20 === 0 ? '├─ ' + String(v).padEnd(4) : '├');
+  }
+  tapeREl.textContent = linesR.join('\n');
+  const fracA = altD / 10 - baseA;
+  tapeREl.style.transform = 'translateY(calc(-50% + ' + (fracA * TAPE_LH - TAPE_LH / 2).toFixed(1) + 'px))';
+  boxREl.className = 'tapebox';
+  boxREl.textContent = '◀ ' + String(Math.round(altD)).padStart(4);
 }
 
 scatterPlants();   // title screen scenery
@@ -2059,6 +2116,7 @@ addEventListener('pointerdown', e => {
   if (!document.body.classList.contains('touch')) return;
   if (e.target.closest('button, input, .lbBtn')) return;
   if (e.target.closest('#lb')) return;                    // overlay handles itself
+  if (e.target.closest('#mHome')) return;                 // home scroll — its own listeners decide
   if (e.target.closest('#msg tr.entry')) return;          // ad card tap = advertiser, not advance
   if (e.target.closest('#lbAttract')) { lbOpen(); return; }
   if (state === S.FLYING && won && e.target.closest('.zone')) return;
@@ -2136,6 +2194,7 @@ async function lbFetch() {
     LB.entries = (await r.json()).entries || [];
   } catch (e) { LB.entries = LB.entries || []; }
   lbAttractInit();
+  lbMobileHome();
 }
 function lbStartToken() {
   LB.token = null;
@@ -2182,6 +2241,45 @@ function lbAttractLeg(wrap, from, to) {
     lbARaf = requestAnimationFrame(step);
   }, to === 0 ? 2500 : 5000);
 }
+
+/* ---------- mobile home: scrollable descent (title → board → ground) ---------- */
+const mHomeEl = document.getElementById('mHome');
+const MH_ALT = 500;   // display altitude at the top of the page
+let mhPrevAlt = MH_ALT, mhPrevT = 0, mhIdleTimer = 0;
+
+function lbMobileHome() {
+  if (!IS_TOUCH()) return;
+  const rows = (LB.entries || []).slice(0, 15);
+  document.getElementById('mHomeTable').innerHTML = rows.map(lbRow).join('');
+  document.getElementById('mHomeMore').style.display = rows.length ? 'block' : 'none';
+  document.getElementById('mHomeBest').textContent = hiscore > 0 ? 'HI-SCORE ' + hiscore + ' PTS' : '';
+  hudEl.classList.remove('hidden');   // the side tapes fly the descent
+  mhTapes(true);
+}
+function mhAlt() {
+  const max = Math.max(1, mHomeEl.scrollHeight - mHomeEl.clientHeight);
+  return (1 - Math.min(1, mHomeEl.scrollTop / max)) * MH_ALT;
+}
+function mhTapes(reset) {
+  if (!IS_TOUCH() || !document.body.classList.contains('home')) return;
+  const now = performance.now();
+  const alt = mhAlt();
+  let vs = 0;
+  if (!reset && now > mhPrevT) {
+    vs = (alt - mhPrevAlt) / ((now - mhPrevT) / 1000) / ALT_SCALE;   // sim units, like flight
+    vs = Math.max(-40, Math.min(40, vs));
+  }
+  mhPrevAlt = alt; mhPrevT = now;
+  renderTapes(alt, vs);
+  clearTimeout(mhIdleTimer);
+  mhIdleTimer = setTimeout(() => renderTapes(mhAlt(), 0), 160);   // hover when the scroll rests
+}
+mHomeEl.addEventListener('scroll', () => mhTapes(false), { passive: true });
+document.getElementById('mHomeMore').addEventListener('click', () => lbOpen());
+document.getElementById('mHomeStart').addEventListener('click', e => {
+  if (e.target.closest('button, tr.entry')) return;
+  pressStart();
+});
 
 /* ---------- full-board overlay ---------- */
 function lbOpen() { lbRenderBoard(); lbEl.classList.remove('hidden'); lbOpenT = performance.now(); }

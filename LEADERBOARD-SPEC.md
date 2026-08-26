@@ -162,7 +162,17 @@ player's campaign score:
 
 - Aesthetic everywhere: Departure Mono, palette #303030 / #e8e4d8 / gold #c2a24e /
   red #9e4b4b, pixelated rendering, all-caps labels.
-- **Title screen — ATTRACT WINDOW** (chosen design, simulated in
+- **Mobile home — SCROLLABLE DESCENT** (touch devices): the home page scrolls
+  vertically as a descent from altitude. Top section (~88vh): title + tagline +
+  blinking down-arrow. Middle: the leaderboard (top 15 rows, full-width) + a
+  full-width `VIEW THE COMPLETE LEADERBOARD ▶` button opening the overlay.
+  Bottom section (100vh): TRANSPARENT — the live game scene shows through
+  (scenery, tinted control zones with labels) + HI-SCORE + blinking
+  `TAP TO START`; tapping there starts the game. THE SIDE HUD TAPES STAY ALIVE
+  during the descent: scroll position maps to altitude (top = 500m → ground =
+  0m) on the right tape, scroll velocity drives the VS tape on the left
+  (LAND box when resting). Desktop keeps the attract window below.
+- **Title screen — ATTRACT WINDOW** (desktop; simulated in
   ranking-preview screen 5): the title block stays put; UNDERNEATH it sits a
   cropped board window exactly 3 cards tall (3 × 53px, overflow hidden, 1px
   hairlines top+bottom), with the tagline just above it and the blinking start
