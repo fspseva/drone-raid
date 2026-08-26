@@ -1403,11 +1403,15 @@ function draw(dt) {
       const base = gy - Math.round(groundAt(s.x) * PPM);  // stand in crater bowls
       const dir = wrapDx(drone.x, s.x) >= 0 ? 1 : -1;
       if (s.cls === 5) {
-        // light tank: raised hull on wheels, small turret, barrel tracks the drone
-        ctx.fillRect(px - 3, base - 3, 7, 2);   // hull
-        ctx.fillRect(px - 1, base - 4, 3, 1);   // turret
+        // light tank: hull nose faces the direction of travel, the turret
+        // barrel independently tracks the drone
+        if (s.vx > 0.1) s.mdir = 1; else if (s.vx < -0.1) s.mdir = -1;
+        const mdir = s.mdir || 1;
+        ctx.fillRect(px - 3, base - 3, 7, 2);              // hull
+        ctx.fillRect(mdir === 1 ? px + 4 : px - 4, base - 2, 1, 1);   // nose
+        ctx.fillRect(px - 1, base - 4, 3, 1);              // turret
         ctx.fillRect(dir === 1 ? px + 2 : px - 3, base - 4, 2, 1);   // barrel
-        ctx.fillRect(px - 2, base - 1, 1, 1);   // wheels
+        ctx.fillRect(px - 2, base - 1, 1, 1);              // wheels
         ctx.fillRect(px + 2, base - 1, 1, 1);
         continue;
       }
