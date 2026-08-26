@@ -204,6 +204,17 @@
   /* on the home screen the touch areas are tinted and labeled */
   body.touch.home .zone { background: rgba(232, 228, 216, 0.06); }
   body.touch.home .zlbl { display: block; }
+  /* bomb counter in the header, centered over the bomb tap column */
+  #bombHud {
+    display: none;
+    position: absolute;
+    top: 3.5%;
+    right: calc(24% + 1px);
+    transform: translateX(50%);
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+  body.touch #bombHud { display: block; }
   /* nudge: thrust area blinks if the pilot hasn't taken off */
   #zThrust.hint {
     background: rgba(232, 228, 216, 0.1);
@@ -303,6 +314,7 @@
       <div id="wind"></div>
       <div id="gs"></div>
       <div id="menu">ESC MENU</div>
+      <div id="bombHud"></div>
       <pre id="stat"></pre>
     </div>
     <div id="banner" class="hidden"></div>
@@ -1675,10 +1687,12 @@ function draw(dt) {
     gsEl.textContent = 'GS ' + Math.abs(drone.vx).toFixed(0).padStart(3);
     const battClass = drone.batt > 0 && drone.batt <= 25 && state === S.FLYING ? 'blink' : '';
     const cells = Math.round(drone.batt / 10);
+    const isTouch = document.body.classList.contains('touch');
     statEl.innerHTML =
       '<span class="' + battClass + '">BATT ' + Math.ceil(drone.batt).toString().padStart(3) + '% ' +
-      '&#9608;'.repeat(cells) + '-'.repeat(10 - cells) + '</span>\n' +
-      'BOMB ' + bombsLeft;
+      '&#9608;'.repeat(cells) + '-'.repeat(10 - cells) + '</span>' +
+      (isTouch ? '' : '\nBOMB ' + bombsLeft);
+    if (isTouch) document.getElementById('bombHud').textContent = 'BOMB ' + bombsLeft;
 
     // stage objectives, centered below the level indicator
     lvlEl.textContent = 'LEVEL ' + level;
