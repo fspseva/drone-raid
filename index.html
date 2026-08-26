@@ -307,6 +307,7 @@
         TILT&nbsp;&nbsp;A D / &#8592; &#8594;&nbsp;&nbsp;&nbsp;&nbsp;BOMB&nbsp;&nbsp;SPACE
       </div>
       <div class="sub blink">PRESS ENTER TO START</div>
+      <div class="sub" id="best"></div>
     </div>
   </div>
   <div id="rotate">ROTATE YOUR DEVICE<br>DRONE RAID FLIES IN LANDSCAPE</div>
@@ -443,6 +444,22 @@ const LEVELS = [
 let level = 1;
 let levelCleared = false;   // pending advance on next Enter
 let verdictPending = false; // drone is down but bombs are still falling
+
+// personal best: highest level cleared, kept in localStorage
+let best = 0;
+try { best = parseInt(localStorage.getItem('droneraid-best'), 10) || 0; } catch (e) {}
+
+function recordClear(lv) {
+  if (lv <= best) return false;
+  best = lv;
+  try { localStorage.setItem('droneraid-best', String(best)); } catch (e) {}
+  return true;
+}
+
+function updateBestLine() {
+  const el = document.getElementById('best');
+  if (el) el.textContent = best > 0 ? 'BEST — LEVEL ' + best : '';
+}
 let bombConfig = 1;         // bombs loaded on the drone at start (set per level)
 // the war drone: small airframe, hot FPV tune
 const DRONE_SPEC = { k: 0.6, hit: 0.35, twr: 4.0, drag: 0.010, lin: 0.08 };
@@ -616,6 +633,7 @@ function gotoMenu() {
   document.body.classList.add('home');
   won = false;
   msgEl.innerHTML = titleHTML;
+  updateBestLine();
   msgEl.classList.remove('hidden');
   hudEl.classList.add('hidden');
   bannerEl.classList.add('hidden');
@@ -1047,7 +1065,8 @@ function step(dt) {
         levelCleared = true;
         verdictPending = false;
         showEnd('LEVEL ' + level + ' CLEARED',
-          'BOMB ON TARGET.', 'PRESS ENTER FOR LEVEL ' + (level + 1));
+          'BOMB ON TARGET.' + (recordClear(level) ? ' NEW RECORD.' : ''),
+          'PRESS ENTER FOR LEVEL ' + (level + 1));
       }
     }
   }
@@ -1297,7 +1316,8 @@ function detonate() {
   if (survivors === 0) {
     levelCleared = true;
     showEnd('LEVEL ' + level + ' CLEARED',
-      '', 'PRESS ENTER FOR LEVEL ' + (level + 1));
+      recordClear(level) ? 'NEW RECORD.' : '',
+      'PRESS ENTER FOR LEVEL ' + (level + 1));
   } else if (airBombs.length > 0) {
     verdictPending = true;   // bombs still falling — the level may yet clear
   } else {
@@ -1696,6 +1716,7 @@ if (matchMedia('(pointer: coarse)').matches) {
   document.getElementById('menu').textContent = 'MENU';
   titleHTML = msgEl.innerHTML;
 }
+updateBestLine();
 
 function bindStick(zoneId, baseId, knobId, apply, release) {
   const zone = document.getElementById(zoneId);
