@@ -418,7 +418,9 @@ const S = { TITLE: 0, FLYING: 1, CRASHED: 2, COMPLETE: 3, DESTROYED: 4 };
 let state = S.TITLE;
 let won = false;      // mission accomplished but the drone is still flying
 
-const PAD = { x: 4, w: 2.0, h: 1.0 };  // launch pad, raised clear of foot traffic
+// launch pad: raised clear of foot traffic, and placed just right of the
+// left HUD tape so a banking thumb never covers the landing view
+const PAD = { x: Math.round(VW * 0.14) / PPM, w: 2.0, h: 1.0 };
 const TENT = { x: WORLD_W * 0.75, w: 2.0, h: 1.25 };  // sim units
 const BLAST_R = 1.2;      // blast radius, a bit wider than the drone
 const BULLET_SPEED = 18;  // slow enough to see and dodge
@@ -675,7 +677,7 @@ function fireBullet(s, muzzleY) {
   });
 }
 
-const drone = { x: 4, y: 0.5, vx: 0, vy: 0, tilt: 0, throttle: 0, eff: 0, batt: 100, grounded: true };
+const drone = { x: PAD.x, y: PAD.h, vx: 0, vy: 0, tilt: 0, throttle: 0, eff: 0, batt: 100, grounded: true };
 let impactSpeed = 0;
 let debris = [];
 let camY = 0;                   // camera offset in meters (0 = ground view)
