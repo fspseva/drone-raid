@@ -115,18 +115,19 @@ Appears in the board at the exact position the player's fresh score earns
 - Closing line: `YOUR PLACEMENT IS PERMANENT. HIGHER SCORES SLOT IN ABOVE YOU —
   WE EMAIL YOU WHEN YOU'RE OUTRANKED.` (email captured by Stripe Checkout automatically).
 
-## 7. Level-start interstitial (the ad surface)
+## 7. The ad block inside the LEVEL CLEARED screen (the ad surface)
 
-Shown before a level launches, when there's a board entry above the player's
-campaign score:
-- `LEVEL <n>` (big) → kicker `NEXT POSITION HELD BY` (10px muted, only 6px above
-  the card) → **card = exact replica of the board row's RAIDER cell**: 424px wide
-  (board width minus 34+80+150 column widths), same 53px height/padding/classes,
-  left-aligned, 1px top+bottom hairlines. No rank, no score, no value.
-- Card click → advertiser URL in a NEW TAB.
+NOT a standalone screen (user removed the separate level-start interstitial) —
+the block is embedded in the existing LEVEL CLEARED end screen, between the
+score line and the PRESS ENTER prompt, when a board entry sits above the
+player's campaign score:
+- kicker `NEXT POSITION HELD BY` (10px muted, 6px above the card) →
+  **card = exact replica of the board row's RAIDER cell**: 424px wide, same
+  height/padding/classes, left-aligned, 1px top+bottom hairlines. No rank,
+  no score, no value.
+- Card click/tap → advertiser URL in a NEW TAB (never advances the game).
 - Below card: `+<diff> PTS TO OUTRANK IT` (diff = that entry's score − player's
   campaign score; target = the LOWEST board score above the player's).
-- Then: `CAN YOU OUTRANK IT? TAP TO CONTINUE`.
 
 ## 8. Backend (Vercel serverless + Stripe)
 

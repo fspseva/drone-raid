@@ -335,7 +335,7 @@
     font-size: 11px; color: rgba(232,228,216,0.7); margin-top: 2px; line-height: 1.5;
     height: 17px; overflow: hidden; white-space: nowrap;
   }
-  #lb, #lbBeat {
+  #lb {
     position: absolute; inset: 0; background: #303030; z-index: 40;
     pointer-events: auto; overflow-y: auto; user-select: none;
     scrollbar-width: thin; scrollbar-color: rgba(232,228,216,0.4) #262626;
@@ -372,13 +372,6 @@
   #lb .rule { font-size: 10px; color: rgba(232,228,216,0.55); line-height: 1.8; margin-top: 10px; text-align: left; }
   #lb .mid { text-align: center; font-size: 12px; line-height: 2; color: rgba(232,228,216,0.8); }
   #lb .bigline { text-align: center; font-size: 20px; letter-spacing: 4px; margin: 22px 0 8px; }
-  /* level-start interstitial */
-  #lbBeat { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; }
-  #lbBeat .lvl { font-size: 20px; letter-spacing: 4px; margin-bottom: 20px; }
-  #lbBeat .kick { font-size: 10px; letter-spacing: 2px; color: rgba(232,228,216,0.5); margin-bottom: 6px; }
-  #lbBeat .cardw { width: 424px; max-width: 92vw; text-align: left; }
-  #lbBeat .pts { font-size: 10px; letter-spacing: 2px; color: rgba(232,228,216,0.5); margin-top: 10px; text-align: center; }
-  #lbBeat .go { font-size: 12px; letter-spacing: 3px; margin-top: 30px; }
   /* touch: compact leaderboard */
   body.touch #lbAttractWrap { height: 120px; }
   body.touch .lbTable td { padding: 5px 6px; }
@@ -458,7 +451,6 @@
       <div class="sub" id="best"></div>
     </div>
     <div id="lb" class="hidden"></div>
-    <div id="lbBeat" class="hidden"></div>
   </div>
   <div id="rotate"><div>ROTATE YOUR DEVICE<br>DRONE RAID FLIES IN LANDSCAPE</div></div>
 </div>
@@ -824,13 +816,6 @@ addEventListener('keydown', e => {
 });
 
 function pressStart() {
-  // continue from the leaderboard interstitial
-  if (!lbBeatEl.classList.contains('hidden')) {
-    lbBeatEl.classList.add('hidden');
-    attempts++;
-    start();
-    return;
-  }
   // a cleared level ALWAYS advances (lives are per level), even if the last
   // drone was spent on the clearing kamikaze; game over only without a clear
   if (levelCleared) {
@@ -842,9 +827,7 @@ function pressStart() {
     attempts = 0;
   }
   // a fresh campaign gets a leaderboard run token (gameplay gate for claims)
-  if (level === 1 && attempts === 0 && score === 0) { lbStartToken(); LB.beatLevel = 0; }
-  // first attempt at a level: show the next raider to outrank
-  if (attempts === 0 && lbMaybeBeat()) return;
+  if (level === 1 && attempts === 0 && score === 0) lbStartToken();
   attempts++;
   start();
 }
@@ -858,7 +841,6 @@ function gotoMenu() {
   msgEl.classList.remove('hidden');
   hudEl.classList.add('hidden');
   bannerEl.classList.add('hidden');
-  lbBeatEl.classList.add('hidden');
   lbAttractInit();   // titleHTML restore recreated the attract window
 }
 
@@ -1579,7 +1561,8 @@ function complete() {
 
 function showEnd(title, line, prompt) {
   // a finished chapter is claimable on the leaderboard (campaign score so far)
-  const clearedLvl = title.indexOf('CLEARED') !== -1 ? level : level - 1;
+  const cleared = title.indexOf('CLEARED') !== -1;
+  const clearedLvl = cleared ? level : level - 1;
   let lbLine = '';
   if (score >= 100 && clearedLvl >= 1) {
     LB.pending = { score, level: clearedLvl };
@@ -1587,9 +1570,11 @@ function showEnd(title, line, prompt) {
       ? '<div class="sub" style="margin-top:6px"><span class="lbBtn" style="pointer-events:auto" onpointerdown="event.stopPropagation();lbOpen()">RECORD ON LEADERBOARD</span></div>'
       : '<div class="sub" style="color:rgba(232,228,216,0.6)">L &nbsp;RECORD ON LEADERBOARD</div>';
   }
+  // the ad surface lives INSIDE the cleared screen: the next raider to outrank
   msgEl.innerHTML =
     '<div class="title">' + title + '</div>' +
     '<div class="sub">' + line + '</div>' +
+    (cleared ? lbBeatBlock() : '') +
     '<div class="sub blink">' + prompt + '</div>' + lbLine;
   msgEl.classList.remove('hidden');
   bannerEl.classList.add('hidden');
@@ -2067,10 +2052,7 @@ addEventListener('pointerdown', e => {
   if (!document.body.classList.contains('touch')) return;
   if (e.target.closest('button, input, .lbBtn')) return;
   if (e.target.closest('#lb')) return;                    // overlay handles itself
-  if (!lbBeatEl.classList.contains('hidden')) {           // interstitial: tap continues
-    if (!e.target.closest('tr.entry')) pressStart();
-    return;
-  }
+  if (e.target.closest('#msg tr.entry')) return;          // ad card tap = advertiser, not advance
   if (e.target.closest('#lbAttract')) { lbOpen(); return; }
   if (state === S.FLYING && won && e.target.closest('.zone')) return;
   if (state !== S.FLYING || won) pressStart();
@@ -2081,11 +2063,9 @@ const LB = {
   entries: null,   // fetched board rows [{rank,name,promo,url,score,bid}]
   token: null,     // signed run token for this campaign
   pending: null,   // { score, level } — finished chapter, claimable
-  beatLevel: 0,    // last level the interstitial was shown for
 };
 const LB_FLOOR = 1;
 const lbEl = document.getElementById('lb');
-const lbBeatEl = document.getElementById('lbBeat');
 const IS_TOUCH = () => document.body.classList.contains('touch');
 
 const LB_PLACEHOLDER = (() => {
@@ -2334,8 +2314,8 @@ async function lbSecured(session) {
     '<div class="bigline">POSITION SECURED</div>' +
     '<div class="mid">POSITION #' + you.rank + ' &#183; ' + lbMoney(you.bid) + ' PAID<br>EVERYONE BELOW YOU SLID DOWN ONE SLOT.</div>' +
     '<div class="lbTagline" style="margin:18px 0 8px">SPREAD THE WORD &#8212; EVERY SHARE INVITES YOUR OUTRANKER</div>' +
-    '<div style="max-width:460px; margin:0 auto"><table class="lbTable" style="border-top:1px solid rgba(232,228,216,0.15)">' +
-    lbRow({ ...you }) + '</table></div>' +
+    '<table class="lbTable" style="border-top:1px solid rgba(232,228,216,0.15)">' +
+    lbRow({ ...you }) + '</table>' +
     '<div class="lbClose" style="display:flex; gap:10px; justify-content:center">' +
     '<button class="lbBtn" onclick="lbShare()">SHARE</button>' +
     '<button class="lbBtn" onclick="lbCopy()">COPY LINK</button>' +
@@ -2352,23 +2332,18 @@ function lbCopy() {
   try { navigator.clipboard.writeText(location.origin); } catch (e) {}
 }
 
-/* ---------- level-start interstitial ---------- */
-function lbMaybeBeat() {
-  const rows = LB.entries || [];
-  if (!rows.length || LB.beatLevel === level) return false;
+/* ---------- the ad block inside the LEVEL CLEARED screen ---------- */
+function lbBeatBlock() {
   let next = null;
-  for (const e of rows) if (e.score > score) next = e;   // lowest entry above the campaign
-  if (!next) return false;
-  LB.beatLevel = level;
-  lbBeatEl.innerHTML =
-    '<div class="lvl">LEVEL ' + level + '</div>' +
-    '<div class="kick">NEXT POSITION HELD BY</div>' +
-    '<div class="cardw"><table class="lbTable" style="border-top:1px solid rgba(232,228,216,0.15)">' +
+  for (const e of LB.entries || []) if (e.score > score) next = e;   // lowest entry above the campaign
+  if (!next) return '';
+  return '<div>' +
+    '<div style="font-size:10px; letter-spacing:2px; color:rgba(232,228,216,0.5); margin-bottom:6px">NEXT POSITION HELD BY</div>' +
+    '<div style="width:424px; max-width:92vw; margin:0 auto; text-align:left; pointer-events:auto">' +
+    '<table class="lbTable" style="border-top:1px solid rgba(232,228,216,0.15)">' +
     '<tr class="entry" data-url="' + lbEscape(next.url || '') + '"><td>' + lbCell(next) + '</td></tr></table></div>' +
-    '<div class="pts">+' + (next.score - score).toLocaleString('en-US') + ' PTS TO OUTRANK IT</div>' +
-    '<div class="go blink">CAN YOU OUTRANK IT? ' + (IS_TOUCH() ? 'TAP' : 'PRESS ENTER') + ' TO CONTINUE</div>';
-  lbBeatEl.classList.remove('hidden');
-  return true;
+    '<div style="font-size:10px; letter-spacing:2px; color:rgba(232,228,216,0.5); margin-top:8px">+' +
+    (next.score - score).toLocaleString('en-US') + ' PTS TO OUTRANK IT</div></div>';
 }
 
 /* ---------- boot ---------- */
