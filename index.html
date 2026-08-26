@@ -199,6 +199,21 @@
   .c.tr { top: 2px; right: 4px; }
   .c.bl { bottom: 2px; left: 4px; }
   .c.br { bottom: 2px; right: 4px; }
+  .zlbl {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: rgba(232, 228, 216, 0.75);
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  /* on the home screen the touch areas are tinted and labeled */
+  body.touch.home .zone { background: rgba(232, 228, 216, 0.06); }
+  body.touch.home .zlbl { display: block; }
   .stickbase {
     position: absolute;
     width: 92px; height: 92px;
@@ -297,10 +312,10 @@
     <div id="banner" class="hidden"></div>
     <div id="panel"></div>
     <div id="touch">
-      <div class="zone" id="zoneL"></div>
-      <div class="zone" id="zBomb"><span class="c tl">&#8598;</span><span class="c tr">&#8599;</span><span class="c bl">&#8601;</span><span class="c br">&#8600;</span></div>
-      <div class="zone" id="zThrust"><span class="c tl">&#8598;</span><span class="c tr">&#8599;</span><span class="c bl">&#8601;</span><span class="c br">&#8600;</span></div>
-      <div class="zone" id="zBrake"><span class="c tl">&#8598;</span><span class="c tr">&#8599;</span><span class="c bl">&#8601;</span><span class="c br">&#8600;</span></div>
+      <div class="zone" id="zoneL"><span class="zlbl">BANK &#8592; &#8594;</span></div>
+      <div class="zone" id="zBomb"><span class="c tl">&#8600;</span><span class="c tr">&#8601;</span><span class="c bl">&#8599;</span><span class="c br">&#8598;</span><span class="zlbl">BOMB</span></div>
+      <div class="zone" id="zThrust"><span class="c tl">&#8600;</span><span class="c tr">&#8601;</span><span class="c bl">&#8599;</span><span class="c br">&#8598;</span><span class="zlbl">THRUST</span></div>
+      <div class="zone" id="zBrake"><span class="c tl">&#8600;</span><span class="c tr">&#8601;</span><span class="c bl">&#8599;</span><span class="c br">&#8598;</span><span class="zlbl">BRAKE</span></div>
       <div class="stickbase hidden" id="baseL"><div class="stickknob" id="knobL"></div></div>
     </div>
     <div id="msg">
@@ -618,6 +633,7 @@ function pressStart() {
 
 function gotoMenu() {
   state = S.TITLE;
+  document.body.classList.add('home');
   won = false;
   msgEl.innerHTML = titleHTML;
   msgEl.classList.remove('hidden');
@@ -676,6 +692,7 @@ function start() {
   }
   won = false;
   state = S.FLYING;
+  document.body.classList.remove('home');
   renderPanel();
   msgEl.classList.add('hidden');
   hudEl.classList.remove('hidden');
@@ -1693,13 +1710,12 @@ renderPanel();
 scatterPlants();   // title screen scenery
 
 /* ---------- touch controls: RC-transmitter style ---------- */
+document.body.classList.add('home');   // starts on the title screen
 if (matchMedia('(pointer: coarse)').matches) {
   document.body.classList.add('touch');
   // rewrite the title-screen instructions for touch
   const subs = msgEl.querySelectorAll('.sub');
-  subs[0].innerHTML =
-    'LEFT STICK&nbsp;&nbsp;BANK<br>' +
-    'RIGHT BOXES&nbsp;&nbsp;BOMB &#183; THRUST / BRAKE';
+  subs[0].remove();   // the tinted zones themselves teach the controls
   subs[1].textContent = 'TAP TO START';
   document.getElementById('menu').textContent = 'MENU';
   titleHTML = msgEl.innerHTML;
