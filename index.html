@@ -486,11 +486,7 @@ function recordClear(lv) {
 
 function updateBestLine() {
   const el = document.getElementById('best');
-  if (el) {
-    el.textContent = best > 0
-      ? 'BEST — LEVEL ' + best + ' · HI-SCORE ' + hiscore
-      : '';
-  }
+  if (el) el.textContent = hiscore > 0 ? 'HI-SCORE ' + hiscore + ' PTS' : '';
 }
 let bombConfig = 1;         // bombs loaded on the drone at start (set per level)
 // the war drone: small airframe, hot FPV tune
