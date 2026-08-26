@@ -473,7 +473,7 @@ try {
 // drone itself if it was expended), minus retry and time penalties
 const CLASS_VALUE = { 1: 300, 2: 450, 3: 600, 4: 750, 5: 1200, 6: 1800 };
 let score = 0;
-let lives = 5;       // drones in the campaign; destruction costs one
+let lives = 5;       // drones per level (max 5); destruction costs one
 let attempts = 0;    // attempts on the current level
 let levelT = 0;      // seconds flown this attempt
 let bombsUsed = 0;   // bombs dropped this attempt
@@ -680,7 +680,7 @@ function pressStart() {
     attempts = 0;
     levelCleared = false;
   }
-  if (levelCleared) { level++; levelCleared = false; attempts = 0; }
+  if (levelCleared) { level++; levelCleared = false; attempts = 0; lives = 5; }
   attempts++;
   start();
 }
