@@ -162,16 +162,21 @@ player's campaign score:
 
 - Aesthetic everywhere: Departure Mono, palette #303030 / #e8e4d8 / gold #c2a24e /
   red #9e4b4b, pixelated rendering, all-caps labels.
-- **Mobile home — SCROLLABLE DESCENT** (touch devices): the home page scrolls
-  vertically as a descent from altitude. Top section (~88vh): title + tagline +
-  blinking down-arrow. Middle: the leaderboard (top 15 rows, full-width) + a
-  full-width `VIEW THE COMPLETE LEADERBOARD ▶` button opening the overlay.
-  Bottom section (100vh): TRANSPARENT — the live game scene shows through
-  (scenery, tinted control zones with labels) + HI-SCORE + blinking
-  `TAP TO START`; tapping there starts the game. THE SIDE HUD TAPES STAY ALIVE
-  during the descent: scroll position maps to altitude (top = 500m → ground =
-  0m) on the right tape, scroll velocity drives the VS tape on the left
-  (LAND box when resting). Desktop keeps the attract window below.
+- **Mobile home — SKY DESCENT** (touch devices): the home is a vertical scroll
+  where the GAME CAMERA descends with it (canvas camY = scroll altitude) — all
+  content floats transparently in the game's sky, landing on the actual
+  level-1 scene at the bottom. Sections: (1) title + tagline + HI-SCORE +
+  blinking ▼, centered in the first viewport; (2) `LEADERBOARD` heading (like
+  the desktop overlay) + top-15 rows + full-width `VIEW THE COMPLETE
+  LEADERBOARD ▶` button; (3) ground viewport: when the scroll reaches the
+  bottom, TWO equal-height buttons fade in just above the horizon —
+  `HOW TO PLAY` (toggles a bordered controls panel: bank stick / thrust /
+  brake / bomb / pad recharge) and `START GAME ▶` (starts). No tinted-zone
+  labels on home anymore. THE SIDE HUD TAPES FLY THE DESCENT: right tape =
+  altitude from scroll (500m → 0), left tape = scroll vertical speed (LAND box
+  at rest). ALL buttons game-wide share one size (.lbBtn 10px 14px, 11px font;
+  the ghost row's compact CLAIM button is the one exception, it lives in a
+  150px table cell). Desktop keeps the attract window below.
 - **Title screen — ATTRACT WINDOW** (desktop; simulated in
   ranking-preview screen 5): the title block stays put; UNDERNEATH it sits a
   cropped board window exactly 3 cards tall (3 × 53px, overflow hidden, 1px

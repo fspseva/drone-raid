@@ -353,7 +353,7 @@
   .lbBtn {
     font-family: inherit; font-size: 11px; letter-spacing: 1px;
     color: #e8e4d8; background: #303030; border: 1px solid #e8e4d8;
-    padding: 6px 12px; cursor: pointer;
+    padding: 10px 14px; cursor: pointer;   /* ONE height for every game button */
   }
   .lbBtn:hover { background: #e8e4d8; color: #303030; }
   #lb .lbClose { text-align: center; margin-top: 14px; }
@@ -387,23 +387,40 @@
   body.touch.home #lbAttract { display: none; }
   /* on the home descent only the side tapes of the HUD are alive */
   body.touch.home #hud > :not(.tape):not(.tapebox) { display: none !important; }
+  /* the descent replaces the tinted-zone tutorial (HOW TO PLAY covers it) */
+  body.touch.home .zone { background: none; }
+  body.touch.home .zlbl { display: none; }
+  /* every section is TRANSPARENT — the content floats in the game's sky while
+     the canvas camera descends underneath (camY follows the scroll) */
   .mhAlt {
-    min-height: 88%;
+    min-height: 100%;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    background: #303030;
     position: relative;
     padding: 0 60px;
     text-align: center;
   }
   .mhTitle { font-size: 26px; letter-spacing: 6px; margin: 8px 0; }
   .mhArrow { position: absolute; bottom: 12px; left: 0; right: 0; text-align: center; font-size: 13px; }
-  .mhBoard { background: #303030; padding: 4px 60px 20px; }
-  #mHomeMore { display: block; width: 100%; margin-top: 12px; padding: 10px; }
+  .mhBoard { padding: 24px 60px 30px; }
+  .mhH1 { font-size: 18px; letter-spacing: 6px; text-align: center; }
+  #mHomeMore { display: block; width: 100%; margin-top: 12px; }
   .mhGround {
     min-height: 100%;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 12px;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+    gap: 14px;
     text-align: center;
+    padding-bottom: 21%;   /* rest just above the horizon line */
+  }
+  .mhButtons { display: flex; gap: 10px; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+  .mhButtons.on { opacity: 1; pointer-events: auto; }
+  .mhHow {
+    border: 1px solid rgba(232,228,216,0.5);
+    background: #303030;
+    padding: 12px 16px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    line-height: 2;
+    color: rgba(232,228,216,0.85);
   }
   /* touch: compact leaderboard */
   body.touch #lbAttractWrap { height: 120px; }
@@ -484,23 +501,35 @@
       <div class="sub" id="best"></div>
     </div>
     <div id="lb" class="hidden"></div>
-    <!-- mobile home: a vertical descent — title at altitude, leaderboard on the
-         way down, the game waiting on the ground (see LEADERBOARD-SPEC.md §9) -->
+    <!-- mobile home: the camera descends with the scroll — title, leaderboard
+         and start controls float in the game's SKY, landing on the level-1
+         scene at the bottom (see LEADERBOARD-SPEC.md §9) -->
     <div id="mHome">
       <section class="mhAlt">
         <div class="titleorn">──────────&#9660;──────────</div>
         <div class="mhTitle">DRONE RAID</div>
         <div class="titleorn">──────────&#9650;──────────</div>
         <div class="lbTagline" style="margin-top:16px">OUTRANK THE COMPETITION &#183; CLAIM YOUR POSITION &#183; PROMOTE WHATEVER YOU WANT</div>
+        <div class="sub" id="mHomeBest" style="margin-top:12px"></div>
         <div class="mhArrow blink">&#9660;</div>
       </section>
       <section class="mhBoard">
+        <div class="mhH1">LEADERBOARD</div>
+        <div class="titleorn" style="font-size:11px; margin:4px 0 14px">──────────&#9660;──────────</div>
         <table class="lbTable" id="mHomeTable"></table>
         <button class="lbBtn" id="mHomeMore">VIEW THE COMPLETE LEADERBOARD &#9654;</button>
       </section>
-      <section class="mhGround" id="mHomeStart">
-        <div class="sub" id="mHomeBest"></div>
-        <div class="sub blink">TAP TO START</div>
+      <section class="mhGround">
+        <div class="mhHow hidden" id="mHomeHow">
+          BANK &#8212; LEFT SIDE, DRAG THE FLOATING STICK &#8592; &#8594;<br>
+          THRUST &#8212; RIGHT TOP &#183; BRAKE &#8212; RIGHT BOTTOM<br>
+          BOMB &#8212; TAP THE MIDDLE-RIGHT COLUMN<br>
+          LAND ON THE PAD TO RECHARGE THE BATTERY
+        </div>
+        <div class="mhButtons" id="mHomeButtons">
+          <button class="lbBtn" id="mHomeHowBtn">HOW TO PLAY</button>
+          <button class="lbBtn" id="mHomeStartBtn">START GAME &#9654;</button>
+        </div>
       </section>
     </div>
   </div>
@@ -893,6 +922,7 @@ function gotoMenu() {
   msgEl.classList.remove('hidden');
   hudEl.classList.add('hidden');
   bannerEl.classList.add('hidden');
+  camY = 0;
   lbAttractInit();   // titleHTML restore recreated the attract window
   if (IS_TOUCH()) { mHomeEl.scrollTop = 0; lbMobileHome(); }   // back to altitude
 }
@@ -2270,16 +2300,19 @@ function mhTapes(reset) {
     vs = Math.max(-40, Math.min(40, vs));
   }
   mhPrevAlt = alt; mhPrevT = now;
+  camY = alt / ALT_SCALE;   // the game camera descends with the scroll
   renderTapes(alt, vs);
+  // the two action buttons appear once the descent reaches the ground
+  const max = mHomeEl.scrollHeight - mHomeEl.clientHeight;
+  document.getElementById('mHomeButtons').classList.toggle('on', mHomeEl.scrollTop >= max - 60);
   clearTimeout(mhIdleTimer);
   mhIdleTimer = setTimeout(() => renderTapes(mhAlt(), 0), 160);   // hover when the scroll rests
 }
 mHomeEl.addEventListener('scroll', () => mhTapes(false), { passive: true });
 document.getElementById('mHomeMore').addEventListener('click', () => lbOpen());
-document.getElementById('mHomeStart').addEventListener('click', e => {
-  if (e.target.closest('button, tr.entry')) return;
-  pressStart();
-});
+document.getElementById('mHomeStartBtn').addEventListener('click', () => pressStart());
+document.getElementById('mHomeHowBtn').addEventListener('click', () =>
+  document.getElementById('mHomeHow').classList.toggle('hidden'));
 
 /* ---------- full-board overlay ---------- */
 function lbOpen() { lbRenderBoard(); lbEl.classList.remove('hidden'); lbOpenT = performance.now(); }
@@ -2355,7 +2388,7 @@ function lbForm(displaceIdx, rank) {
     '<label>HOW YOU&#39;LL LOOK IN THE RANKINGS</label>' +
     '<div class="preview" id="lbPreview"></div>' +
     '<div class="payrow"><span class="minbid">MIN BID ' + lbMoney(min) + '</span>' +
-    '<div style="text-align:right"><button class="lbBtn" style="font-size:13px; padding:9px 16px" onclick="lbPay()">PAY WITH STRIPE &#9654;</button>' +
+    '<div style="text-align:right"><button class="lbBtn" onclick="lbPay()">PAY WITH STRIPE &#9654;</button>' +
     '<div style="font-size:9px; letter-spacing:1px; color:rgba(232,228,216,.55); margin-top:5px">APPLE PAY &#183; GOOGLE PAY</div></div></div>' +
     '<div class="rule" id="lbErr" style="color:#9e4b4b"></div>' +
     '<div class="rule">YOUR ENTRY GOES LIVE THE MOMENT PAYMENT CONFIRMS.</div>' +
