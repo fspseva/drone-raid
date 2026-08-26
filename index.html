@@ -204,6 +204,12 @@
   /* on the home screen the touch areas are tinted and labeled */
   body.touch.home .zone { background: rgba(232, 228, 216, 0.06); }
   body.touch.home .zlbl { display: block; }
+  /* nudge: thrust area blinks if the pilot hasn't taken off */
+  #zThrust.hint {
+    background: rgba(232, 228, 216, 0.1);
+    animation: blink 0.6s steps(1) infinite;
+  }
+  #zThrust.hint .zlbl { display: block; }
   .stickbase {
     position: absolute;
     width: 92px; height: 92px;
@@ -682,6 +688,7 @@ function start() {
   }
   won = false;
   state = S.FLYING;
+  hintT = 0;
   document.body.classList.remove('home');
   renderPanel();
   msgEl.classList.add('hidden');
@@ -1355,6 +1362,7 @@ function worldToScreen(wx, wy) {
 }
 
 let blinkT = 0;
+let hintT = 0;   // time waiting for the first thrust of a round
 
 // stepped tilt sprites: integer fillRects only, no rotation, no anti-aliasing.
 // rects are [x, y, w, h] offsets from the drone anchor; flames are [x, y] (2px wide).
@@ -1421,6 +1429,16 @@ function drawDrone(px, py) {
 
 function draw(dt) {
   blinkT += dt;
+
+  // mobile nudge: blink the thrust area if the round started 2s ago and the
+  // pilot still hasn't thrust
+  if (document.body.classList.contains('touch') &&
+      state === S.FLYING && !hasLifted && !keys['w']) {
+    hintT += dt;
+  } else {
+    hintT = 0;
+  }
+  document.getElementById('zThrust').classList.toggle('hint', hintT > 2);
   ctx.fillStyle = BG;
   ctx.fillRect(0, 0, VW, VH);
 
