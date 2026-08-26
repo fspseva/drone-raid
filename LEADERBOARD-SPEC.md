@@ -167,8 +167,11 @@ player's campaign score:
   content floats transparently in the game's sky, landing on the actual
   level-1 scene at the bottom. Sections: (1) title + tagline + HI-SCORE +
   blinking ▼, centered in the first viewport; (2) `LEADERBOARD` heading (like
-  the desktop overlay) + top-15 rows + full-width `VIEW THE COMPLETE
-  LEADERBOARD ▶` button; (3) ground viewport: when the scroll reaches the
+  the desktop overlay) + top-15 rows + `VIEW THE COMPLETE LEADERBOARD ▶`
+  button — ALL exactly 424px wide, the width of the in-game cards (NEXT
+  POSITION frame), transparent, clear of the tapes. Home rows show
+  rank + score + raider only (no VALUE — that lives on the full board);
+  promo at 8px there so 53-char lines never crop; (3) ground viewport: when the scroll reaches the
   bottom, TWO equal-height buttons fade in just above the horizon —
   `HOW TO PLAY` (toggles a bordered controls panel: bank stick / thrust /
   brake / bomb / pad recharge) and `START GAME ▶` (starts). No tinted-zone

@@ -401,9 +401,15 @@
   }
   .mhTitle { font-size: 26px; letter-spacing: 6px; margin: 8px 0; }
   .mhArrow { position: absolute; bottom: 12px; left: 0; right: 0; text-align: center; font-size: 13px; }
-  /* the EXACT same panel box as the internal screens (#lb .wrap): 688px max,
-     same side padding, opaque — the tapes pass behind it, not through it */
-  .mhBoard { max-width: 688px; margin: 0 auto; padding: 24px 16px 30px; background: #303030; }
+  /* the EXACT width of the in-game cards (424px, like the NEXT POSITION frame)
+     — fits between the tapes, so it stays transparent in the sky */
+  .mhBoard { max-width: 424px; margin: 0 auto; padding: 24px 0 30px; }
+  /* home board: rank + score + raider only (VALUE lives on the full board);
+     compact columns + 8px promo keep 53-char lines uncropped at 424px */
+  #mHomeTable td.bidc { display: none; }
+  #mHomeTable td.rank { width: 26px; }
+  #mHomeTable td.score { width: 70px; }
+  #mHomeTable .lbTag { font-size: 8px; }
   .mhH1 { font-size: 18px; letter-spacing: 6px; text-align: center; }
   #mHomeMore { display: block; width: 100%; margin-top: 12px; }
   .mhGround {
