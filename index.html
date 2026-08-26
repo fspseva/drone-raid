@@ -299,6 +299,12 @@
     font-size: 15px;
     letter-spacing: 3px;
     text-align: center;
+    line-height: 2;
+  }
+  #rotate .dim {
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: rgba(232, 228, 216, 0.7);
   }
   @media (orientation: portrait) {
     body.touch #rotate { display: flex; }
@@ -1812,6 +1818,20 @@ scatterPlants();   // title screen scenery
 document.body.classList.add('home');   // starts on the title screen
 if (matchMedia('(pointer: coarse)').matches) {
   document.body.classList.add('touch');
+  // opened in a mobile browser (not installed): teach the install first —
+  // the full experience needs the home-screen app, not just a rotation
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  if (!standalone) {
+    const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    document.getElementById('rotate').innerHTML =
+      'ADD TO HOME SCREEN<br>' +
+      '<span class="dim">' +
+      (ios ? 'TAP SHARE, THEN &#8220;ADD TO HOME SCREEN&#8221;'
+           : 'BROWSER MENU, THEN &#8220;ADD TO HOME SCREEN&#8221;') +
+      '</span><br><br>' +
+      'THEN ROTATE TO LANDSCAPE<br>' +
+      '<span class="dim">DRONE RAID FLIES FULLSCREEN</span>';
+  }
   // rewrite the title-screen instructions for touch
   const subs = msgEl.querySelectorAll('.sub');
   subs[0].remove();   // the tinted zones themselves teach the controls
