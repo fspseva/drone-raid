@@ -158,6 +158,12 @@ player's campaign score:
 - Apple Pay / Google Pay are automatic on hosted Checkout — no config.
 - No products/prices/subscriptions in Stripe. No refund code.
 - Statement descriptor: DRONE RAID.
+- `POST /api/run-start` returns `{ token, seed }`: a signed single-use run
+  token plus the campaign's PRNG seed (derived server-side from the run id via
+  HMAC — `runSeed()` — so the verifier can recompute it and a replay only
+  makes sense against the run that produced it).
+- `POST /api/claim` REQUIRES a `replay` and re-simulates it before Stripe
+  (see §11). The recomputed score/level must equal the claimed ones exactly.
 - **Storage:** single board document (JSON) in Vercel storage (Blob or KV —
   decide at build time; webhook is the only writer, traffic is small).
 - Success URL returns to the game with the confirmation/share screen; cancel URL
@@ -204,6 +210,41 @@ player's campaign score:
 - **Level start:** interstitial from §7 (needs the board + player campaign score).
 - Campaign score = the player's current total for this progression run.
 
+## 11. Replay verification (anti-fake tier 2 — BUILT)
+
+Claims are proven, not trusted. How it works end to end:
+
+- **Deterministic sim.** Gameplay code uses ONLY exact IEEE-754 ops: a seeded
+  mulberry32 PRNG (`rng()`/`srand()`), polynomial `dSin/dCos/dExp`, and
+  `dHypot` = sqrt(x²+y²) — never Math.random/sin/cos/exp/hypot/atan2 (those
+  remain for pure visuals: stars, screen shake). Bullet aim is exact vector
+  normalization. Verified bit-exact between Chromium (V8), WebKit (JSC ­—
+  Safari) and Node — recorded in one, re-simulated in another, identical
+  scores and per-step state fingerprints.
+- **Seeding.** Per-attempt stream = `mixSeed(campaignSeed, level, attempt)`.
+  The campaign seed comes from `/api/run-start`. The home screen previews the
+  level-1 forest from the same stream (forest is the FIRST draw in `start()`),
+  so the scenery the pilot lands into on the home descent IS level 1's.
+- **Recording.** Bomb drops are queued and consumed on the 120Hz step grid.
+  Per attempt the recorder stores `{ l, a, d: [step*16+inputMask…],
+  b: [dropStep…], e: endStep, h: stateFingerprint }` — a few hundred bytes per
+  attempt. The fingerprint folds drone/soldiers/score/wind state at attempt
+  end; the verifier recomputes and compares it per attempt.
+- **Verification.** `window.__verifyRun(replay)` (active when
+  `window.__VERIFY__` is set before parse) resets the campaign and replays
+  every attempt through the real `pressStart()`/`step()` code. The server
+  (`api/_verify.js`) runs the DEPLOYED index.html inside jsdom (canvas/rAF/
+  fetch stubbed, viewport reproduced from `replay.vw` — world geometry depends
+  on it), so client and verifier share one sim source. jsdom is PINNED to v25
+  (v29's dep graph ships ESM that Vercel's runtime cannot require()).
+- **Claim flow.** Client sends `replay` with the claim; server checks: run
+  token valid+unused, replay ends in game over, recomputed score AND level
+  exactly equal the claimed ones. A forged score is answered with
+  `replay disproves the claimed score (sim: N pts, level L)`. Verification
+  runs in ~20-50ms; `vercel.json` gives claim 60s/1GB headroom.
+- Superhuman TAS-crafted input scripts remain possible (inherent to replay
+  systems) — but the game must actually be beaten by the inputs submitted.
+
 ## 10. Open items
 
 **Build status (2026-08-26):** backend (§8) and in-game surfaces (§9) are LIVE
@@ -211,7 +252,7 @@ on droneraid.callmeseva.cc with LIVE Stripe keys. Floor is $1 (see §2). The
 webhook→insert path is the only piece not yet exercised end-to-end — the first
 real claim is the test. Anti-fake tier 1 (signed single-use run tokens, score
 ceilings per level, minimum-elapsed-time, server-side bid recompute) enforced;
-tier 2 (seeded-RNG replay verification) not yet built. Also deferred: OG
+tier 2 (replay verification) is BUILT and live — see §11. Still deferred: OG
 share-card image endpoint, share-card PNG download, outranked-email notifier.
 
 - Server-side score validation is v1-trusted (client-reported); replay validation

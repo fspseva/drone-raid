@@ -991,6 +991,9 @@ function start() {
   // deterministic stream for this attempt: campaign seed + level + attempt
   srand(mixSeed(LB.run ? LB.run.seed : 0, level, attempts));
   recBeginAttempt();
+  // forest first: the FIRST draws from the stream, so lbHomeForest (same seed,
+  // same order) previews the exact level-1 scenery on the home screen
+  scatterPlants();
   drone.x = PAD.x;
   drone.y = PAD.h;
   drone.vx = 0; drone.vy = 0;
@@ -1020,9 +1023,6 @@ function start() {
   bombsLeft = bombConfig;
   reloadT = 0;
   chunks = [];
-  // same sub-seed => same forest: level 1 attempt 1 reproduces the exact
-  // scenery previewed on the home screen (lbHomeForest uses the same stream)
-  scatterPlants();
   document.body.classList.remove('howto');
   camY = 0; shake = 0;
   verdictPending = false;

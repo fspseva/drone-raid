@@ -112,9 +112,10 @@ effMult  = clamp(0.9 + 0.1 × kills/munitions, …, 1.3)
 | 12 | 18,720 | 71,370 |
 | 15 | 43,875 | 174,915 |
 
-(The server enforces these as the anti-fake score ceiling: a claimed campaign
-score must be ≤ the cumulative max for the level reached — `maxCampaignScore()`
-in `api/_lib.js` — plus a minimum of 2.5s of play per level.)
+(These ceilings remain a server sanity bound, but the real gate is REPLAY
+VERIFICATION: every claim carries the campaign's recorded inputs and the
+server re-simulates them with the run's seed — the recomputed score is the
+only one accepted. See LEADERBOARD-SPEC.md §11.)
 
 ### Worked example
 
