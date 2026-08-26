@@ -270,33 +270,6 @@
   @media (orientation: portrait) {
     body.touch #rotate { display: flex; }
   }
-  /* temporary level testbed */
-  #panel {
-    position: absolute;
-    top: 4.5%;
-    right: 4.5%;
-    font-size: 11px;
-    letter-spacing: 1px;
-    color: #e8e4d8;
-    background: #303030;
-    border: 1px solid #e8e4d8;
-    padding: 6px 10px;
-    user-select: none;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  #panel button {
-    font-family: inherit;
-    font-size: 11px;
-    color: #e8e4d8;
-    background: #303030;
-    border: 1px solid #e8e4d8;
-    width: 18px; height: 16px;
-    line-height: 1;
-    cursor: pointer;
-    padding: 0;
-  }
 </style>
 </head>
 <body>
@@ -318,7 +291,6 @@
       <pre id="stat"></pre>
     </div>
     <div id="banner" class="hidden"></div>
-    <div id="panel"></div>
     <div id="touch">
       <div class="zone" id="zoneL"><span class="zlbl">BANK &#8592; &#8594;</span></div>
       <div class="zone" id="zBomb"><span class="zlbl">BOMB</span></div>
@@ -702,7 +674,6 @@ function start() {
   state = S.FLYING;
   hintT = 0;
   document.body.classList.remove('home');
-  renderPanel();
   msgEl.classList.add('hidden');
   hudEl.classList.remove('hidden');
   bannerEl.classList.add('hidden');
@@ -1711,23 +1682,6 @@ function draw(dt) {
     }
   }
 }
-
-/* ---------- temporary level testbed ---------- */
-const panelEl = document.getElementById('panel');
-function renderPanel() {
-  panelEl.innerHTML = 'TEST LEVEL' +
-    '<button data-d="-1">-</button><span>' + level + '</span><button data-d="1">+</button>';
-}
-panelEl.addEventListener('click', e => {
-  const btn = e.target.closest('button');
-  if (!btn) return;
-  level = Math.min(99, Math.max(1, level + +btn.dataset.d));
-  levelCleared = false;
-  renderPanel();
-  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-  if (state === S.FLYING || won) start();   // jump straight into the chosen level
-});
-renderPanel();
 
 scatterPlants();   // title screen scenery
 
