@@ -1772,15 +1772,19 @@ function draw(dt) {
     gsEl.textContent = 'GS ' + Math.abs(drone.vx).toFixed(0).padStart(3);
     const battClass = drone.batt > 0 && drone.batt <= 25 && state === S.FLYING ? 'blink' : '';
     const cells = Math.round(drone.batt / 10);
-    statEl.innerHTML =
+    // rewrite these only on change — recreating nodes every frame restarts
+    // (and therefore freezes) the CSS blink animations
+    const statHtml =
       '<span class="' + battClass + '">BATT ' + Math.ceil(drone.batt).toString().padStart(3) + '% ' +
       '&#9608;'.repeat(cells) + '-'.repeat(10 - cells) + '</span>';
-    document.getElementById('bombs').innerHTML =
-      bombConfig > 0
-        ? (bombsLeft > 0
-            ? 'BOMB' + '<span class="bombicon"></span>'.repeat(bombsLeft)
-            : '<span class="blink">RELOAD OR KAMIKAZE</span>')
-        : '';
+    if (statEl.dataset.h !== statHtml) { statEl.innerHTML = statHtml; statEl.dataset.h = statHtml; }
+    const bombsEl = document.getElementById('bombs');
+    const bombsHtml = bombConfig > 0
+      ? (bombsLeft > 0
+          ? 'BOMB' + '<span class="bombicon"></span>'.repeat(bombsLeft)
+          : '<span class="blink">RELOAD OR KAMIKAZE</span>')
+      : '';
+    if (bombsEl.dataset.h !== bombsHtml) { bombsEl.innerHTML = bombsHtml; bombsEl.dataset.h = bombsHtml; }
 
     // stage objectives, centered below the level indicator
     lvlEl.textContent = 'LEVEL ' + level;
