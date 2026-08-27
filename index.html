@@ -1817,6 +1817,16 @@ function worldToScreen(wx, wy) {
 }
 
 let blinkT = 0;
+// pad reload hint: pixel ↓ (even width — centers exactly on the pad) + 3×5 label
+const HINT_ARROW = ['001100', '001100', '001100', '111111', '011110', '001100'];
+const HINT_FONT = {
+  R: ['110', '101', '110', '101', '101'],
+  E: ['111', '100', '110', '100', '111'],
+  L: ['100', '100', '100', '100', '111'],
+  O: ['111', '101', '101', '101', '111'],
+  A: ['010', '101', '111', '101', '101'],
+  D: ['110', '101', '101', '101', '110'],
+};
 let hintT = 0;   // time waiting for the first thrust of a round
 
 // stepped tilt sprites: integer fillRects only, no rotation, no anti-aliasing.
@@ -2073,13 +2083,26 @@ function draw(dt) {
   // (visual only — Math.sin/blinkT never touch the seeded sim stream)
   if (state === S.FLYING && bombConfig > 0 && bombsLeft === 0 && padAlive) {
     const bob = Math.round(Math.abs(Math.sin(blinkT * 4)) * 2);
+    ctx.fillStyle = FG;
     for (const wx of [PAD.x - WORLD_W, PAD.x, PAD.x + WORLD_W]) {
-      const p = worldToScreen(wx, PAD.h + 2.2);
-      if (p.x < -4 || p.x > VW + 4) continue;
-      const ay = p.y - bob;
-      ctx.fillStyle = 'rgba(232, 228, 216, 0.5)';   // discreet chevron
-      ctx.fillRect(p.x - 1, ay - 2, 3, 1);
-      ctx.fillRect(p.x, ay - 1, 1, 1);
+      // arrow bottom one pad-height above the deck, centered on the pad
+      // (the 16px deck centers on a half-pixel — even-width glyphs align exactly)
+      const p = worldToScreen(wx, PAD.h * 2);
+      if (p.x < -24 || p.x > VW + 24) continue;
+      const cx = Math.round(p.x);
+      for (let r = 0; r < 6; r++) {
+        const row = HINT_ARROW[r];
+        for (let c = 0; c < 6; c++)
+          if (row[c] === '1') ctx.fillRect(cx - 3 + c, p.y - 6 + r - bob, 1, 1);
+      }
+      let x0 = cx - 12;   // RELOAD, static above the bounce range
+      for (const ch of 'RELOAD') {
+        const g = HINT_FONT[ch];
+        for (let r = 0; r < 5; r++)
+          for (let c = 0; c < 3; c++)
+            if (g[r][c] === '1') ctx.fillRect(x0 + c, p.y - 16 + r, 1, 1);
+        x0 += 4;
+      }
     }
   }
 
