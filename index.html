@@ -256,11 +256,11 @@
      On appearance they fly in from a 200%-size box (lock-on), glyphs unscaled. */
   .tgt span {
     position: absolute; font-size: 12px; line-height: 1;
-    animation: tgtLock 0.25s steps(4) both;
+    animation: tgtLock 0.6s steps(4) both;   /* ~2 blinks at 200%, then shrink */
   }
   @keyframes tgtLock {
-    from { transform: translate(calc(-50% + var(--dx) * var(--gx)), calc(-50% + var(--dy) * var(--gy))); }
-    to   { transform: translate(-50%, -50%); }
+    0%, 56% { transform: translate(calc(-50% + var(--dx) * var(--gx)), calc(-50% + var(--dy) * var(--gy))); }
+    100%    { transform: translate(-50%, -50%); }
   }
   @keyframes tgtBlink { 50% { opacity: 0; } }
   body.touch #padHint { font-size: 9px; }
@@ -1009,6 +1009,7 @@ function gotoMenu() {
   state = S.TITLE;
   document.body.classList.add('home');
   won = false;
+  clearTimeout(endRevealTimer);
   msgEl.innerHTML = titleHTML;
   updateBestLine();
   msgEl.classList.remove('hidden');
@@ -1078,6 +1079,7 @@ function start() {
     windSpeed = 10 + Math.round(rng() * 20);  // 10..30
   }
   won = false;
+  clearTimeout(endRevealTimer);
   LB.pending = null;   // recording is offered at game over only
   state = S.FLYING;
   hintT = 0;
@@ -1826,14 +1828,22 @@ function showEnd(title, line, prompt) {
     mid = lbBeatBlock();
   }
   if (IS_TOUCH()) prompt = prompt.replace('PRESS ENTER', 'TAP');
-  msgEl.innerHTML =
+  const html =
     '<div class="title">' + title + '</div>' +
     '<div class="sub">' + line + '</div>' +
     mid +
     '<div class="sub blink">' + prompt + '</div>' + lbLine;
-  msgEl.classList.remove('hidden');
   bannerEl.classList.add('hidden');
+  // a beat of tension before every verdict (also holds back the end-screen
+  // survivor designators, which key off the msg becoming visible)
+  clearTimeout(endRevealTimer);
+  msgEl.classList.add('hidden');
+  endRevealTimer = setTimeout(() => {
+    msgEl.innerHTML = html;
+    msgEl.classList.remove('hidden');
+  }, 500);
 }
+let endRevealTimer = 0;
 
 /* ---------- rendering ---------- */
 // static stars, in world space above ground
