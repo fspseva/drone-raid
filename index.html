@@ -251,7 +251,9 @@
   @keyframes phBob { 50% { transform: translateY(4px); } }
   #tgtHints { position: absolute; inset: 0; pointer-events: none; user-select: none; }
   .tgt { position: absolute; color: #9e4b4b; animation: tgtBlink 0.16s steps(1) infinite; }
-  .tgt span { position: absolute; font-size: 11px; line-height: 1; }
+  /* box-drawing corners ink from the CELL CENTER outward — centering each
+     glyph on the frame corner puts the visible bracket exactly on the frame */
+  .tgt span { position: absolute; font-size: 12px; line-height: 1; transform: translate(-50%, -50%); }
   @keyframes tgtBlink { 50% { opacity: 0; } }
   body.touch #padHint { font-size: 9px; }
   body.touch #padHint .phA { font-size: 11px; }
@@ -1924,22 +1926,26 @@ function updateHudHints() {
   if (tgtHintsEl.childElementCount !== targets.length) {
     tgtHintsEl.innerHTML = targets.map(() =>
       '<div class="tgt">' +
-      '<span style="left:0;top:0">&#9487;</span><span style="right:0;top:0">&#9491;</span>' +
-      '<span style="left:0;bottom:0">&#9495;</span><span style="right:0;bottom:0">&#9499;</span></div>').join('');
+      '<span style="left:0;top:0">&#9487;</span><span style="left:100%;top:0">&#9491;</span>' +
+      '<span style="left:0;top:100%">&#9495;</span><span style="left:100%;top:100%">&#9499;</span></div>').join('');
   }
-  const PADDING = 0.25;   // sim-meters around the bounding box
+  const GAP = 2;   // equal breathing room around the drawing, canvas px
   targets.forEach((t, i) => {
     const el = tgtHintsEl.children[i];
     const out = t.emerged && !t.inside;
     const cx = out ? t.x : TENT.x;
-    // frame the SPRITE, not the (wider) combat hitbox — infantry is portrait
-    const hw = (out ? (t.cls === 6 ? 1.2 : t.cls === 5 ? 0.9 : 0.25) : TENT.w / 2) + PADDING;
-    const hgt = (out ? (t.cls >= 5 ? 1.0 : 0.65) : TENT.h) + PADDING;
-    const top = worldToScreen(cx, groundAt(cx) + hgt);
-    el.style.left = ((top.x - hw * PPM) * sc) + 'px';
-    el.style.top = (top.y * sc) + 'px';
-    el.style.width = (hw * 2 * PPM * sc) + 'px';
-    el.style.height = (hgt * PPM * sc) + 'px';
+    const base = worldToScreen(cx, groundAt(cx)).y;   // sprite baseline (ground)
+    const pxp = Math.round(cx * PPM);
+    // exact sprite boxes from the draw code: [left, width, top, height]
+    let L, W, T, H;
+    if (!out)              { L = pxp - 8; W = 17; T = base - 10; H = 10; }   // tent
+    else if (t.cls === 6)  { L = pxp - 4; W = 9;  T = base - 5;  H = 5;  }  // heavy tank
+    else if (t.cls === 5)  { L = pxp - 4; W = 9;  T = base - 4;  H = 4;  }  // light tank
+    else                   { L = pxp - 1; W = 3;  T = base - 4;  H = 4;  }  // soldier
+    el.style.left = ((L - GAP) * sc) + 'px';
+    el.style.top = ((T - GAP) * sc) + 'px';
+    el.style.width = ((W + 2 * GAP) * sc) + 'px';
+    el.style.height = ((H + 2 * GAP) * sc) + 'px';
   });
 }
 
