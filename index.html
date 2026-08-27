@@ -1927,13 +1927,14 @@ function updateHudHints() {
       '<span style="left:0;top:0">&#9487;</span><span style="right:0;top:0">&#9491;</span>' +
       '<span style="left:0;bottom:0">&#9495;</span><span style="right:0;bottom:0">&#9499;</span></div>').join('');
   }
-  const PADDING = 0.4;   // sim-meters around the bounding box
+  const PADDING = 0.25;   // sim-meters around the bounding box
   targets.forEach((t, i) => {
     const el = tgtHintsEl.children[i];
     const out = t.emerged && !t.inside;
     const cx = out ? t.x : TENT.x;
-    const hw = (out ? (t.cls === 6 ? 1.2 : t.cls === 5 ? 0.9 : 0.5) : TENT.w / 2) + PADDING;
-    const hgt = (out ? (t.cls >= 5 ? 1.0 : 0.6) : TENT.h) + PADDING;
+    // frame the SPRITE, not the (wider) combat hitbox — infantry is portrait
+    const hw = (out ? (t.cls === 6 ? 1.2 : t.cls === 5 ? 0.9 : 0.25) : TENT.w / 2) + PADDING;
+    const hgt = (out ? (t.cls >= 5 ? 1.0 : 0.65) : TENT.h) + PADDING;
     const top = worldToScreen(cx, groundAt(cx) + hgt);
     el.style.left = ((top.x - hw * PPM) * sc) + 'px';
     el.style.top = (top.y * sc) + 'px';
