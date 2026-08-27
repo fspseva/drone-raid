@@ -2072,16 +2072,14 @@ function draw(dt) {
   // empty rack: a bouncing arrow over the pad points the way to a reload
   // (visual only — Math.sin/blinkT never touch the seeded sim stream)
   if (state === S.FLYING && bombConfig > 0 && bombsLeft === 0 && padAlive) {
-    const bob = Math.round(Math.abs(Math.sin(blinkT * 5)) * 6);
+    const bob = Math.round(Math.abs(Math.sin(blinkT * 4)) * 2);
     for (const wx of [PAD.x - WORLD_W, PAD.x, PAD.x + WORLD_W]) {
-      const p = worldToScreen(wx, PAD.h + 3.4);
-      if (p.x < -6 || p.x > VW + 6) continue;
+      const p = worldToScreen(wx, PAD.h + 2.2);
+      if (p.x < -4 || p.x > VW + 4) continue;
       const ay = p.y - bob;
-      ctx.fillStyle = FG;
-      ctx.fillRect(p.x - 1, ay - 8, 2, 5);   // shaft
-      ctx.fillRect(p.x - 3, ay - 3, 6, 1);   // arrow head
-      ctx.fillRect(p.x - 2, ay - 2, 4, 1);
-      ctx.fillRect(p.x - 1, ay - 1, 2, 1);
+      ctx.fillStyle = 'rgba(232, 228, 216, 0.5)';   // discreet chevron
+      ctx.fillRect(p.x - 1, ay - 2, 3, 1);
+      ctx.fillRect(p.x, ay - 1, 1, 1);
     }
   }
 
