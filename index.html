@@ -1939,12 +1939,13 @@ const tgtHintsEl = document.getElementById('tgtHints');
 function updateHudHints() {
   const sc = stage.clientWidth / VW;   // canvas px -> CSS px
 
-  // objective stays up until the target designators finish their window;
-  // the thrust instruction leaves as soon as the drone lifts
-  const showBrief = state === S.FLYING && (!hasLifted || levelT <= liftT + 4.5);
+  // objective clears halfway through the designator window (read the count,
+  // then follow the brackets); the thrust instruction leaves at liftoff.
+  // visibility (not display) keeps the objective from shifting position.
+  const showBrief = state === S.FLYING && (!hasLifted || levelT <= liftT + 2.25);
   briefEl.classList.toggle('hidden', !showBrief);
   if (showBrief) {
-    briefEl.children[1].style.display = hasLifted ? 'none' : '';
+    briefEl.children[1].style.visibility = hasLifted ? 'hidden' : 'visible';
     const n = soldiers.filter(t => t.alive).length;
     const h = 'ELIMINATE ' + n + (n > 1 ? ' TARGETS' : ' TARGET');
     if (briefEl.dataset.h !== h) {
