@@ -250,6 +250,19 @@
   #padHint .phA { font-size: 14px; letter-spacing: 0; animation: phBob 0.7s steps(2) infinite; }
   @keyframes phBob { 50% { transform: translateY(4px); } }
   #tgtHints { position: absolute; inset: 0; pointer-events: none; user-select: none; }
+  /* pre-takeoff briefing: objective + how to lift off */
+  #brief {
+    position: absolute; inset: 0 0 16.667% 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 10px;
+    text-align: center;
+    pointer-events: none;
+    user-select: none;
+  }
+  #brief .bTitle { color: #9e4b4b; font-size: 14px; letter-spacing: 3px; }
+  #brief .bSub { color: rgba(232, 228, 216, 0.75); font-size: 10px; letter-spacing: 2px; }
+  body.touch #brief .bTitle { font-size: 11px; }
+  body.touch #brief .bSub { font-size: 9px; }
   .tgt { position: absolute; color: #9e4b4b; animation: tgtBlink 0.16s steps(1) infinite; }
   /* box-drawing corners ink from the CELL CENTER outward — centering each
      glyph on the frame corner puts the visible bracket exactly on the frame.
@@ -525,6 +538,10 @@
     </div>
     <div id="banner" class="hidden"></div>
     <div id="tgtHints"></div>
+    <div id="brief" class="hidden">
+      <div class="bTitle"></div>
+      <div class="bSub"></div>
+    </div>
     <div id="padHint"><div>RELOAD</div><div class="phA">&#8595;</div></div>
     <div id="touch">
       <div class="zone" id="zoneL"><span class="zlbl">BANK &#8592; &#8594;</span></div>
@@ -1917,9 +1934,27 @@ function drawDroneSprite(g2, px, py) {
 
 /* ---------- HUD hints: reload arrow over the pad + target designators ---------- */
 const padHintEl = document.getElementById('padHint');
+const briefEl = document.getElementById('brief');
 const tgtHintsEl = document.getElementById('tgtHints');
 function updateHudHints() {
   const sc = stage.clientWidth / VW;   // canvas px -> CSS px
+
+  // objective stays up until the target designators finish their window;
+  // the thrust instruction leaves as soon as the drone lifts
+  const showBrief = state === S.FLYING && (!hasLifted || levelT <= liftT + 4.5);
+  briefEl.classList.toggle('hidden', !showBrief);
+  if (showBrief) {
+    briefEl.children[1].style.display = hasLifted ? 'none' : '';
+    const n = soldiers.filter(t => t.alive).length;
+    const h = 'ELIMINATE ' + n + (n > 1 ? ' TARGETS' : ' TARGET');
+    if (briefEl.dataset.h !== h) {
+      briefEl.dataset.h = h;
+      briefEl.children[0].textContent = h;
+      briefEl.children[1].textContent = IS_TOUCH()
+        ? 'TAP THE HIGHLIGHTED AREA TO THRUST'
+        : 'PRESS \u2191 TO THRUST';
+    }
+  }
 
   // empty rack: RELOAD + bouncing ↓ character over the pad
   const showPad = state === S.FLYING && bombConfig > 0 && bombsLeft === 0 && padAlive;
@@ -1993,7 +2028,7 @@ function draw(dt) {
   } else {
     hintT = 0;
   }
-  document.getElementById('zThrust').classList.toggle('hint', hintT > 2);
+  document.getElementById('zThrust').classList.toggle('hint', hintT > 0.2);
   ctx.fillStyle = BG;
   ctx.fillRect(0, 0, VW, VH);
 
