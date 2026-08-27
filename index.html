@@ -1915,9 +1915,11 @@ function updateHudHints() {
   }
 
   // 4 seconds of fast-blinking corner brackets around every target, starting
-  // half a second after the drone departs (hidden targets are framed AS the tent)
-  const act = state === S.FLYING && hasLifted &&
-    levelT >= liftT + 0.5 && levelT <= liftT + 4.5;
+  // half a second after the drone departs (hidden targets are framed AS the
+  // tent) — and again on end screens, marking the survivors
+  const endScreen = state !== S.FLYING && state !== S.TITLE && !msgEl.classList.contains('hidden');
+  const act = endScreen || (state === S.FLYING && hasLifted &&
+    levelT >= liftT + 0.5 && levelT <= liftT + 4.5);
   if (!act) {
     if (tgtHintsEl.childElementCount) tgtHintsEl.innerHTML = '';
     return;
