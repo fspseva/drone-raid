@@ -252,8 +252,16 @@
   #tgtHints { position: absolute; inset: 0; pointer-events: none; user-select: none; }
   .tgt { position: absolute; color: #9e4b4b; animation: tgtBlink 0.16s steps(1) infinite; }
   /* box-drawing corners ink from the CELL CENTER outward — centering each
-     glyph on the frame corner puts the visible bracket exactly on the frame */
-  .tgt span { position: absolute; font-size: 12px; line-height: 1; transform: translate(-50%, -50%); }
+     glyph on the frame corner puts the visible bracket exactly on the frame.
+     On appearance they fly in from a 200%-size box (lock-on), glyphs unscaled. */
+  .tgt span {
+    position: absolute; font-size: 12px; line-height: 1;
+    animation: tgtLock 0.25s steps(4) both;
+  }
+  @keyframes tgtLock {
+    from { transform: translate(calc(-50% + var(--dx) * var(--gx)), calc(-50% + var(--dy) * var(--gy))); }
+    to   { transform: translate(-50%, -50%); }
+  }
   @keyframes tgtBlink { 50% { opacity: 0; } }
   body.touch #padHint { font-size: 9px; }
   body.touch #padHint .phA { font-size: 11px; }
@@ -1926,8 +1934,8 @@ function updateHudHints() {
   if (tgtHintsEl.childElementCount !== targets.length) {
     tgtHintsEl.innerHTML = targets.map(() =>
       '<div class="tgt">' +
-      '<span style="left:0;top:0">&#9487;</span><span style="left:100%;top:0">&#9491;</span>' +
-      '<span style="left:0;top:100%">&#9495;</span><span style="left:100%;top:100%">&#9499;</span></div>').join('');
+      '<span style="left:0;top:0;--dx:-1;--dy:-1">&#9487;</span><span style="left:100%;top:0;--dx:1;--dy:-1">&#9491;</span>' +
+      '<span style="left:0;top:100%;--dx:-1;--dy:1">&#9495;</span><span style="left:100%;top:100%;--dx:1;--dy:1">&#9499;</span></div>').join('');
   }
   const GAP = 2;   // equal breathing room around the drawing, canvas px
   targets.forEach((t, i) => {
@@ -1946,6 +1954,9 @@ function updateHudHints() {
     el.style.top = ((T - GAP) * sc) + 'px';
     el.style.width = ((W + 2 * GAP) * sc) + 'px';
     el.style.height = ((H + 2 * GAP) * sc) + 'px';
+    // lock-on start offsets: half the box per side = 200% initial size
+    el.style.setProperty('--gx', ((W + 2 * GAP) / 2 * sc) + 'px');
+    el.style.setProperty('--gy', ((H + 2 * GAP) / 2 * sc) + 'px');
   });
 }
 
