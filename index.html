@@ -507,7 +507,6 @@
       <div id="boxR" class="tapebox"></div>
       <pre id="bank"></pre>
       <div id="lvl"></div>
-      <div id="obj"></div>
       <div id="pts"></div>
       <div id="drones"></div>
       <div id="wind"></div>
@@ -599,7 +598,6 @@ const windEl = document.getElementById('wind');
 const gsEl = document.getElementById('gs');
 const statEl = document.getElementById('stat');
 const lvlEl = document.getElementById('lvl');
-const objEl = document.getElementById('obj');
 const msgEl = document.getElementById('msg');
 let titleHTML = msgEl.innerHTML;   // for returning to the menu via ESC
 const bannerEl = document.getElementById('banner');
@@ -1532,7 +1530,7 @@ function step(dt) {
       showEnd('GAME OVER', 'FINAL SCORE ' + score + ' PTS.', 'PRESS ENTER TO RESTART');
     } else {
       showEnd('MISSION FAILED',
-        survivors + (survivors > 1 ? ' TARGETS' : ' TARGET') + ' SURVIVED.',
+        '<span style="color:#9e4b4b">' + survivors + (survivors > 1 ? ' TARGETS' : ' TARGET') + ' SURVIVED</span>',
         'PRESS ENTER TO RETRY');
     }
   }
@@ -1783,7 +1781,7 @@ function detonate() {
     showEnd('GAME OVER', 'FINAL SCORE ' + score + ' PTS.', 'PRESS ENTER TO RESTART');
   } else {
     showEnd('MISSION FAILED',
-      survivors + (survivors > 1 ? ' TARGETS' : ' TARGET') + ' SURVIVED.',
+      '<span style="color:#9e4b4b">' + survivors + (survivors > 1 ? ' TARGETS' : ' TARGET') + ' SURVIVED</span>',
       'PRESS ENTER TO RETRY');
   }
 }
@@ -1795,7 +1793,7 @@ function complete() {
     showEnd('FLIGHT COMPLETE', 'BATTERY SPENT. TOUCHDOWN ' + impactSpeed.toFixed(1) + ' M/S.', 'PRESS ENTER TO FLY AGAIN');
   } else {
     showEnd('MISSION FAILED',
-      'BATTERY SPENT. ' + survivors + (survivors > 1 ? ' TARGETS' : ' TARGET') + ' SURVIVED.',
+      'BATTERY SPENT. <span style="color:#9e4b4b">' + survivors + (survivors > 1 ? ' TARGETS' : ' TARGET') + ' SURVIVED</span>',
       'PRESS ENTER TO RETRY');
   }
 }
@@ -2195,7 +2193,6 @@ function draw(dt) {
 
     // stage objectives, centered below the level indicator
     lvlEl.textContent = 'LEVEL ' + level;
-    objEl.textContent = 'TARGETS ' + soldiers.filter(s => s.alive).length;
     document.getElementById('pts').textContent = score + ' PTS';
     document.getElementById('drones').textContent = Math.max(0, lives) + ' DRONES LEFT';
 
