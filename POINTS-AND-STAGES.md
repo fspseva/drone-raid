@@ -50,28 +50,28 @@ LTK, HTK, BOMBS)`):
 
 | Level | WAN | FUG | PST | SHG | LTK | HTK | Bombs | Units | Base PTS | Par time |
 |------:|----:|----:|----:|----:|----:|----:|------:|------:|---------:|---------:|
-| 1 | 1 | – | – | – | – | – | 0 | 1 | 300 | 12s |
-| 2 | 2 | – | – | – | – | – | 1 | 2 | 600 | 16s |
-| 3 | – | 1 | – | – | – | – | 1 | 1 | 450 | 12s |
-| 4 | 1 | 1 | – | – | – | – | 1 | 2 | 750 | 16s |
-| 5 | – | – | 1 | – | – | – | 1 | 1 | 600 | 12s |
-| 6 | – | – | 2 | – | – | – | 1 | 2 | 1,200 | 16s |
-| 7 | 1 | 2 | 1 | – | – | – | 2 | 4 | 1,800 | 24s |
-| 8 | – | – | 2 | 1 | – | – | 2 | 3 | 1,950 | 20s |
-| 9 | – | – | – | 1 | – | – | 0 | 1 | 750 | 12s |
-| 10 | – | – | 1 | 1 | – | – | 1 | 2 | 1,350 | 16s |
+| 1 | 1 | – | – | – | – | – | 3 | 1 | 300 | 12s |
+| 2 | 2 | – | – | – | – | – | 3 | 2 | 600 | 16s |
+| 3 | – | 1 | – | – | – | – | 3 | 1 | 450 | 12s |
+| 4 | 1 | 1 | – | – | – | – | 3 | 2 | 750 | 16s |
+| 5 | – | – | 1 | – | – | – | 3 | 1 | 600 | 12s |
+| 6 | – | – | 2 | – | – | – | 3 | 2 | 1,200 | 16s |
+| 7 | 1 | 2 | 1 | – | – | – | 3 | 4 | 1,800 | 24s |
+| 8 | – | – | 2 | 1 | – | – | 3 | 3 | 1,950 | 20s |
+| 9 | – | – | – | 1 | – | – | 3 | 1 | 750 | 12s |
+| 10 | – | – | 1 | 1 | – | – | 3 | 2 | 1,350 | 16s |
 | 11 | 1 | 2 | 1 | 1 | 1 | – | 3 | 6 | 3,750 | 32s |
 | 12 | – | 2 | 2 | 2 | 1 | – | 3 | 7 | 4,800 | 36s |
-| 13 | 2 | 2 | 2 | 1 | 1 | 1 | 4 | 9 | 6,450 | 44s |
-| 14 | – | 3 | 3 | 2 | 2 | 1 | 4 | 11 | 8,850 | 52s |
-| 15 | 2 | 3 | 3 | 2 | 2 | 2 | 5 | 14 | 11,250 | 64s |
+| 13 | 2 | 2 | 2 | 1 | 1 | 1 | 3 | 9 | 6,450 | 44s |
+| 14 | – | 3 | 3 | 2 | 2 | 1 | 3 | 11 | 8,850 | 52s |
+| 15 | 2 | 3 | 3 | 2 | 2 | 2 | 3 | 14 | 11,250 | 64s |
 
 - **Past level 15** the game continues forever: each extra level adds **+1 FUG
   and +1 PST** to the level-15 roster (each capped at 6).
-- **BOMBS** is the drone's loadout at takeoff. Landing on the pad reloads
-  **1 bomb per second** up to the loadout (and recharges the battery). Levels
-  with 0 bombs are kamikaze-only. Bombs on the rack cook off with the warhead:
-  kamikaze damage = **1 + bombs remaining** blasts.
+- **BOMBS**: every level starts with a loadout of **3**. Landing on the pad
+  reloads **1 bomb per second** up to the loadout (and recharges the battery).
+  Bombs on the rack cook off with the warhead: kamikaze damage =
+  **1 + bombs remaining** blasts (a full rack = 4 — one-shots a heavy tank).
 - **Wind milestones**: dead calm until the campaign's **first heavy tank
   kill**; for the next 5 levels wind is random **5–10**; beyond that, random
   **10–30**. Direction is random each attempt.
@@ -107,8 +107,7 @@ effMult  = clamp(0.9 + 0.1 × kills/munitions, …, 1.3)
 | Level | Max award | Max campaign total |
 |------:|----------:|-------------------:|
 | 1 | 1,170 | 1,170 |
-| 5 | 2,340 | 10,530 |
-| 10 | 5,265 | 38,025 |
+| 5 | 2,340 | 10,530 | 3 | 10 | 5,265 | 38,025 |
 | 12 | 18,720 | 71,370 |
 | 15 | 43,875 | 174,915 |
 
