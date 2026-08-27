@@ -701,6 +701,7 @@ let padAlive = true;
 let soldiers = [];    // moving targets on the ground
 let bullets = [];     // { x, y, vx, vy, life }
 let hasLifted = false;
+let liftT = -1;   // levelT at first liftoff (drives the target designators)
 let craters = [];     // { x } — holes blasted into the ground
 let boomFx = null;    // { x, y, age } — explosion flash
 let airBombs = [];    // { x, y, vx, vy } — bombs in flight (no drop delay)
@@ -1049,6 +1050,7 @@ function start() {
   }
   bullets = [];
   hasLifted = false;
+  liftT = -1;
   debris = [];
   craters = [];
   boomFx = null;
@@ -1281,7 +1283,7 @@ function step(dt) {
   if (drone.x < 0) drone.x += WORLD_W;
   if (drone.x >= WORLD_W) drone.x -= WORLD_W;
 
-  if (!drone.grounded) hasLifted = true;
+  if (!drone.grounded && !hasLifted) { hasLifted = true; liftT = levelT; }
   } // droneSim
 
   // soldiers: everyone waits inside the tent until the drone lifts off,
@@ -1910,9 +1912,10 @@ function updateHudHints() {
     padHintEl.style.top = (p.y * sc) + 'px';
   }
 
-  // first 3 seconds of an attempt: fast-blinking corner brackets frame every
-  // target (targets still inside the tent are framed AS the tent)
-  const act = state === S.FLYING && levelT <= 3;
+  // 4 seconds of fast-blinking corner brackets around every target, starting
+  // half a second after the drone departs (hidden targets are framed AS the tent)
+  const act = state === S.FLYING && hasLifted &&
+    levelT >= liftT + 0.5 && levelT <= liftT + 4.5;
   if (!act) {
     if (tgtHintsEl.childElementCount) tgtHintsEl.innerHTML = '';
     return;
@@ -1921,8 +1924,8 @@ function updateHudHints() {
   if (tgtHintsEl.childElementCount !== targets.length) {
     tgtHintsEl.innerHTML = targets.map(() =>
       '<div class="tgt">' +
-      '<span style="left:0;top:0">&#9484;</span><span style="right:0;top:0">&#9488;</span>' +
-      '<span style="left:0;bottom:0">&#9492;</span><span style="right:0;bottom:0">&#9496;</span></div>').join('');
+      '<span style="left:0;top:0">&#9487;</span><span style="right:0;top:0">&#9491;</span>' +
+      '<span style="left:0;bottom:0">&#9495;</span><span style="right:0;bottom:0">&#9499;</span></div>').join('');
   }
   const PADDING = 0.4;   // sim-meters around the bounding box
   targets.forEach((t, i) => {
